@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/* Examia palette — keep logo and brand colors */
+@theme {
+  --color-examia-dark: #27374D;
+  --color-examia-mid: #526D82;
+  --color-examia-soft: #9DB2BF;
+  --color-examia-bg: #DDE6ED;
+}
+
+:root {
+  --font-sans: 'Outfit', 'DM Sans', system-ui, sans-serif;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --shadow-card: 0 1px 3px rgba(39, 55, 77, 0.06);
+  --shadow-card-hover: 0 4px 12px rgba(39, 55, 77, 0.08);
+  --shadow-dropdown: 0 10px 40px rgba(39, 55, 77, 0.12);
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-examia-bg);
+  color: var(--color-examia-dark);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Consistent focus ring for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--color-examia-mid);
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Auth form helpers (keep colors) */
+.input-auth {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(157, 178, 191, 0.5);
+  background: white;
+  color: #27374D;
+  font-size: 0.9375rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.input-auth::placeholder {
+  color: rgba(82, 109, 130, 0.7);
+}
+.input-auth:focus {
+  border-color: #526D82;
+  box-shadow: 0 0 0 3px rgba(82, 109, 130, 0.15);
+  outline: none;
+}
+
+.btn-auth-primary {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border-radius: 0.75rem;
+  background: #27374D;
+  color: white;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+.btn-auth-primary:hover:not(:disabled) {
+  background: #526D82;
+}
+.btn-auth-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn-auth-primary:focus-visible {
+  outline: 2px solid #526D82;
+  outline-offset: 2px;
+}
