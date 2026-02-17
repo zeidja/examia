@@ -4,10 +4,12 @@ import { generateToken } from '../utils/jwt.js';
 import { sendOTPEmail, sendPasswordResetConfirmation } from '../services/emailService.js';
 import crypto from 'crypto';
 
+// Only set Secure when served over HTTPS (browsers won't send cookie over HTTP otherwise)
+const isHttps = (process.env.CLIENT_URL || '').startsWith('https');
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict',
+  secure: isHttps,
+  sameSite: 'lax',
   maxAge: (process.env.JWT_COOKIE_EXPIRE || 7) * 24 * 60 * 60 * 1000,
 };
 
