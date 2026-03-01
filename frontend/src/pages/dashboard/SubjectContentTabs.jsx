@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import katex from 'katex';
@@ -160,18 +160,76 @@ function ResourceCard({ r, openFile, flashCardSummary }) {
   );
 }
 
+/** Static “coming soon” features in Fundamentals: path, title, short description, icon (svg path). */
+const FUNDAMENTALS_COMING_SOON = [
+  {
+    path: 'definitions',
+    title: 'Definitions',
+    description: 'Key terms and definitions for this subject',
+    icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+  },
+  {
+    path: 'command-terms',
+    title: 'Command Terms',
+    description: 'IB command terms and what they ask for',
+    icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+  },
+  {
+    path: 'checklists',
+    title: 'Check Lists',
+    description: 'Structured checklists for your work',
+    icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+  },
+];
+
 export function SubjectMaterials() {
+  const { subjectId } = useParams();
   const { resources } = useOutletContext() || {};
   const materials = (resources || []).filter((r) => r.type === 'material');
   const openFile = (id) => window.open(`/api/resources/${id}/file`, '_blank');
+  const base = `/content/subject/${subjectId}`;
 
   return (
     <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-      <h2 className="text-lg font-semibold text-examia-dark mb-3">Materials</h2>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {materials.map((r) => <ResourceCard key={r._id} r={r} openFile={openFile} />)}
+      <h2 className="text-lg font-semibold text-examia-dark mb-3">Fundamentals</h2>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+        {FUNDAMENTALS_COMING_SOON.map((item, i) => (
+          <Link
+            key={item.path}
+            to={`${base}/${item.path}`}
+            className="group block rounded-2xl border-2 border-examia-soft/30 bg-gradient-to-br from-white to-examia-soft/5 p-5 shadow-sm hover:shadow-md hover:border-examia-soft/50 transition-all duration-200 text-left"
+          >
+            <div className="flex items-start gap-4">
+              <span className="flex shrink-0 w-12 h-12 rounded-xl bg-examia-dark/10 text-examia-dark flex items-center justify-center group-hover:bg-examia-dark/15 transition-colors">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                </svg>
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-examia-dark group-hover:text-examia-mid transition-colors">{item.title}</h3>
+                <p className="text-sm text-examia-mid mt-0.5">{item.description}</p>
+                <span className="inline-flex items-center gap-1.5 mt-3 text-xs font-medium text-examia-mid">
+                  Coming soon
+                  <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </span>
+              </div>
+            </div>
+          </Link>
+        ))}
       </div>
-      {materials.length === 0 && <p className="text-examia-mid text-sm">No materials for this subject yet.</p>}
+
+      {materials.length > 0 && (
+        <>
+          <h3 className="text-base font-semibold text-examia-dark mb-3">Materials</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {materials.map((r) => <ResourceCard key={r._id} r={r} openFile={openFile} />)}
+          </div>
+        </>
+      )}
+      {materials.length === 0 && <p className="text-examia-mid text-sm">No fundamentals for this subject yet.</p>}
     </motion.section>
   );
 }
@@ -298,7 +356,7 @@ export function SubjectIdeas() {
               </svg>
             </span>
             <div>
-              <h2 className="text-xl font-bold text-examia-dark">Ideas chat</h2>
+              <h2 className="text-xl font-bold text-examia-dark">Idea Generation</h2>
               <p className="text-examia-mid text-sm">Chat to get IA and assessment ideas. The tutor may ask a few questions first, then suggest ideas.</p>
             </div>
           </div>
@@ -449,7 +507,7 @@ export function SubjectStudyLearn() {
             </svg>
           </span>
           <div>
-            <h2 className="text-xl font-bold text-examia-dark">Study and Learn</h2>
+            <h2 className="text-xl font-bold text-examia-dark">Study Lab</h2>
             <p className="text-examia-mid text-sm">Chat with your IB tutor. Choose which materials to use below.</p>
           </div>
         </div>
@@ -680,7 +738,7 @@ export function SubjectFeynman() {
             </svg>
           </span>
           <div>
-            <h2 className="text-xl font-bold text-examia-dark">Feynman</h2>
+            <h2 className="text-xl font-bold text-examia-dark">Teach & Learn</h2>
             <p className="text-examia-mid text-sm">Teach a topic; the agent will ask questions as a curious learner, then evaluate your understanding when you say you&apos;re done.</p>
           </div>
         </div>
@@ -689,7 +747,7 @@ export function SubjectFeynman() {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 && (
             <div className="text-center py-8 text-examia-mid text-sm">
-              <p>Choose a topic and teach it to the Feynman agent.</p>
+              <p>Choose a topic and teach it to the Teach & Learn agent.</p>
               <p className="mt-1">After each concept, it will ask clarification questions. When you&apos;re finished, say &quot;I&apos;m done&quot; or &quot;That&apos;s everything&quot; to get a diagnostic evaluation (no grades).</p>
             </div>
           )}
@@ -773,7 +831,7 @@ export function SubjectFeedback() {
 
   return (
     <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="bg-white rounded-2xl p-6 shadow-sm border border-examia-soft/30">
-      <h2 className="text-lg font-semibold text-examia-dark mb-2">Internal Assessment — AI feedback</h2>
+      <h2 className="text-lg font-semibold text-examia-dark mb-2">Feedback Generator</h2>
       <p className="text-examia-mid text-sm mb-4">Upload your Internal Assessment draft (PDF, Word, or TXT) to get AI notes and suggestions.</p>
       <form onSubmit={handleReviewSubmit} className="space-y-4">
         <div>
@@ -800,6 +858,39 @@ export function SubjectFeedback() {
           <pre className="whitespace-pre-wrap text-sm text-examia-dark font-sans">{reviewFeedback}</pre>
         </div>
       )}
+    </motion.section>
+  );
+}
+
+/** Static “Coming Soon” page for features like Definitions, Command Terms, Check Lists. */
+export function ComingSoonPage({ title }) {
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="max-w-xl mx-auto"
+    >
+      <div className="rounded-3xl border-2 border-examia-soft/30 bg-gradient-to-b from-white to-examia-soft/10 shadow-lg overflow-hidden">
+        <div className="px-8 pt-12 pb-10 text-center">
+          <div className="w-20 h-20 rounded-2xl bg-examia-dark/10 flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-examia-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-examia-dark tracking-tight">{title}</h1>
+          <p className="mt-3 text-examia-mid text-base">This section is under development. We’ll add it soon so you can use it in your studies.</p>
+          <div className="mt-8 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200/80">
+            <span className="text-amber-700 font-medium text-sm">Coming soon</span>
+            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+        </div>
+        <div className="px-8 py-4 bg-examia-soft/10 border-t border-examia-soft/30 text-center">
+          <p className="text-xs text-examia-mid">Check back later or continue with other Fundamentals.</p>
+        </div>
+      </div>
     </motion.section>
   );
 }

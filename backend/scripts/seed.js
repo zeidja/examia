@@ -173,6 +173,7 @@ function getSubjectCode(folderName) {
   const map = {
     Biology: 'BIO',
     Business: 'BM',
+    Chemistry: 'CHEM',
     Economics: 'ECON',
     GlobalPolitics: 'GP',
     Math: 'MATH',

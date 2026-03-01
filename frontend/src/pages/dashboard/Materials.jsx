@@ -93,7 +93,7 @@ export function Materials() {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <div className="animate-spin rounded-full h-10 w-10 border-2 border-examia-mid border-t-transparent" />
-        <p className="text-sm text-examia-mid font-medium">Loading materials…</p>
+        <p className="text-sm text-examia-mid font-medium">Loading fundamentals…</p>
       </div>
     );
   }
@@ -107,8 +107,8 @@ export function Materials() {
       className="max-w-6xl"
     >
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-examia-dark">Materials</h1>
-        <p className="text-examia-mid mt-1 text-sm">Platform materials folder. Used as context for AI generation. Open files to preview.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-examia-dark">Fundamentals</h1>
+        <p className="text-examia-mid mt-1 text-sm">Platform fundamentals folder. Used as context for AI generation. Open files to preview.</p>
       </div>
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-examia-soft/20">
         <ul className="space-y-0">
@@ -124,8 +124,8 @@ export function Materials() {
         </ul>
         {children.length === 0 && !tree?.error && (
           <div className="py-12 text-center">
-            <p className="font-semibold text-examia-dark">No materials found</p>
-            <p className="text-examia-mid text-sm mt-1">Add folders and files to the materials directory on the server.</p>
+            <p className="font-semibold text-examia-dark">No fundamentals found</p>
+            <p className="text-examia-mid text-sm mt-1">Add folders and files to the fundamentals directory on the server.</p>
           </div>
         )}
         {tree?.error && <p className="text-red-600 text-sm py-4">Error loading tree: {tree.error}</p>}

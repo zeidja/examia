@@ -37,7 +37,7 @@ export function SubjectContentLayout() {
           <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         </div>
         <p className="font-semibold text-examia-dark">Subject not found</p>
-        <Link to="/content" className="mt-4 inline-flex items-center gap-2 text-examia-mid hover:text-examia-dark font-medium transition">← Back to My content</Link>
+        <Link to="/content" className="mt-4 inline-flex items-center gap-2 text-examia-mid hover:text-examia-dark font-medium transition">← Back to Modules</Link>
       </div>
     );
   }
@@ -50,7 +50,7 @@ export function SubjectContentLayout() {
           className="inline-flex items-center gap-1.5 text-sm font-medium text-examia-mid hover:text-examia-dark transition"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          My content
+          Modules
         </Link>
         <span className="text-examia-soft">/</span>
         <h1 className="text-2xl font-bold tracking-tight text-examia-dark">{subject.name}</h1>

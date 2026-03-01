@@ -153,17 +153,24 @@ export function Dashboard() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-examia-dark text-white font-medium hover:bg-examia-mid transition shadow-sm"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                My content
+                Modules
               </Link>
               <Link
-                to="/ai/flash-cards"
+                to="/content/notes"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-examia-soft/40 text-examia-dark font-medium hover:bg-examia-soft/15 hover:border-examia-soft/50 transition"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                Note taking
+              </Link>
+              <Link
+                to="/content"
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-examia-soft/40 text-examia-dark font-medium hover:bg-examia-soft/15 hover:border-examia-soft/50 transition"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                 Flash cards
               </Link>
               <Link
-                to="/ai/quizzes"
+                to="/content"
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-examia-soft/40 text-examia-dark font-medium hover:bg-examia-soft/15 hover:border-examia-soft/50 transition"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
@@ -205,7 +212,7 @@ export function Dashboard() {
                       </Link>
                     ))}
                   </div>
-                  <Link to="/content" className="inline-block mt-4 text-sm font-medium text-examia-mid hover:text-examia-dark transition">View all in My content →</Link>
+                  <Link to="/content" className="inline-block mt-4 text-sm font-medium text-examia-mid hover:text-examia-dark transition">View all in Modules →</Link>
                 </motion.section>
               )}
 
@@ -235,7 +242,7 @@ export function Dashboard() {
                       </Link>
                     ))}
                   </div>
-                  <Link to="/content" className="inline-block mt-4 text-sm font-medium text-examia-mid hover:text-examia-dark transition">View all in My content →</Link>
+                  <Link to="/content" className="inline-block mt-4 text-sm font-medium text-examia-mid hover:text-examia-dark transition">View all in Modules →</Link>
                 </motion.section>
               )}
 
@@ -246,7 +253,7 @@ export function Dashboard() {
                   className="bg-white rounded-2xl p-8 shadow-sm border border-examia-soft/20 text-center"
                 >
                   <p className="font-semibold text-examia-dark">No quizzes or flash cards yet</p>
-                  <p className="text-examia-mid text-sm mt-2">Your teachers will publish content here. Check <Link to="/content" className="font-medium text-examia-mid hover:text-examia-dark">My content</Link> for subjects and materials.</p>
+                  <p className="text-examia-mid text-sm mt-2">Your teachers will publish content here. Check <Link to="/content" className="font-medium text-examia-mid hover:text-examia-dark">Modules</Link> for subjects and fundamentals.</p>
                 </motion.div>
               )}
             </div>

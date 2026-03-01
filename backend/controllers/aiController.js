@@ -17,9 +17,17 @@ import TeacherResource from '../models/TeacherResource.js';
 import fs from 'fs/promises';
 import path from 'path';
 
+/** Get a short context string listing topic/folder names for a subject (for Feynman/ideas). Resolves subject by exact name or case-insensitive match to materials folder. */
 async function getResourcesContext(subjectName) {
+  const name = (subjectName || '').trim();
+  if (!name) return '';
   const paths = await getSubjectPaths();
-  const subjectPath = paths[subjectName];
+  let subjectPath = paths[name];
+  if (!subjectPath) {
+    const lower = name.toLowerCase();
+    const folder = Object.keys(paths).find((f) => f.toLowerCase() === lower);
+    if (folder) subjectPath = paths[folder];
+  }
   if (!subjectPath) return '';
   try {
     const entries = await fs.readdir(subjectPath, { withFileTypes: true });

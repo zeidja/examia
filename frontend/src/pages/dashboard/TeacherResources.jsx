@@ -11,7 +11,7 @@ const typeFilters = [
   { id: '', label: 'All' },
   { id: 'quiz', label: 'Quiz' },
   { id: 'flash_cards', label: 'Flash cards' },
-  { id: 'material', label: 'Materials' },
+  { id: 'material', label: 'Fundamentals' },
 ];
 
 export function TeacherResources() {
@@ -151,7 +151,7 @@ export function TeacherResources() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-examia-dark">Resources</h1>
           <p className="text-examia-mid mt-1 text-sm">
-            {me?.role === 'teacher' ? 'Create and publish quizzes, flash cards, and materials. Students see published items in My content.' : 'Manage and publish resources for your school.'}
+            {me?.role === 'teacher' ? 'Create and publish quizzes, flash cards, and materials. Students see published items in Modules.' : 'Manage and publish resources for your school.'}
           </p>
         </div>
         {me?.role === 'teacher' && (

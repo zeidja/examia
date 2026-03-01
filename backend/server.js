@@ -13,6 +13,8 @@ import aiPromptRoutes from './routes/aiPromptRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import resourceRoutes from './routes/resourceRoutes.js';
 import ideaRoutes from './routes/ideaRoutes.js';
+import insightsRoutes from './routes/insightsRoutes.js';
+import lessonNoteRoutes from './routes/lessonNoteRoutes.js';
 
 connectDB();
 
@@ -39,6 +41,8 @@ app.use('/api/ai-prompts', aiPromptRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/ideas', ideaRoutes);
+app.use('/api/insights', insightsRoutes);
+app.use('/api/lesson-notes', lessonNoteRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

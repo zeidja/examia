@@ -155,6 +155,7 @@ function FlashCardViewer({ cards, resourceId }) {
         const newPos = sessionPosition >= newDeck.length ? Math.max(0, newDeck.length - 1) : sessionPosition;
         setSessionDeck(newDeck);
         setSessionPosition(newPos);
+        setFlipped(false);
 
         if (rating === 'hard') {
           hardRevisitRef.current = setTimeout(() => {
@@ -519,7 +520,7 @@ export function ContentView() {
     return (
       <div className="text-center py-12">
         <p className="text-examia-mid">Content not found.</p>
-        <Link to="/content" className="text-examia-mid font-medium mt-2 inline-block">Back to My content</Link>
+        <Link to="/content" className="text-examia-mid font-medium mt-2 inline-block">Back to Modules</Link>
       </div>
     );
   }
@@ -530,7 +531,7 @@ export function ContentView() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Link to="/content" className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to My content</Link>
+      <Link to="/content" className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to Modules</Link>
       <h1 className="text-2xl font-bold text-examia-dark mb-2">{resource.title}</h1>
       {resource.description && <p className="text-examia-mid mb-6">{resource.description}</p>}
 

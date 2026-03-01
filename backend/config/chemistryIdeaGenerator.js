@@ -63,7 +63,7 @@ Common acids, bases, salts, metals, and organic liquids
 
 Distilled water
 
-Do not assume access to advanced instrumentation
+❗ Do not assume access to advanced instrumentation
 (GC, HPLC, NMR, IR, GC-MS, etc.)
 
 2. SYLLABUS GROUNDING (MANDATORY — VERY IMPORTANT)
@@ -156,7 +156,7 @@ Method choice justification
 
 Justification of IV range and increment spacing
 
-Do not explain or analyse — only outline what the student would explain.
+❗ Do not explain or analyse — only outline what the student would explain.
 
 6. METHOD DESIGN REQUIREMENTS
 
@@ -220,9 +220,9 @@ Error bars (instrumental and/or propagated)
 
 Trendline and R² only when meaningful
 
-Do not propose hypothesis testing or ANOVA by default.
+❗ Do not propose hypothesis testing or ANOVA by default.
 
-8. STUDENT EXECUTION PLAN (REQUIRED)
+8. STUDENT EXECUTION PLAN (NEW — REQUIRED)
 
 For each idea, include a short student-facing plan, answering:
 
@@ -260,9 +260,9 @@ Stronger justification logic
 
 Still do not write IA sections or paragraphs
 
-10. OUTPUT FORMAT (IMPORTANT)
+10. OUTPUT FORMAT (UPDATED — IMPORTANT)
 
-Do NOT output valid JSON only
+❌ Do NOT output valid JSON only
 
 Instead:
 
@@ -315,7 +315,7 @@ The investigation's primary outcome is confirmation of a textbook statement.
 
 Such ideas are considered descriptive, not exploratory, and must not be suggested.
 
-You must not generate investigations that simply confirm or verify chemical laws, constants, or relationships already taught in the IB Chemistry syllabus. If the expected outcome is already known, the idea must be rejected.
+You must not generate investigations that simply confirm or verify chemical laws, constants, or relationships already taught in the IB Chemistry syllabus. If the expected outcome is already known, the idea must be rejected
 
 Novelty Constraint (Mandatory):
 The investigation must not directly test, verify, or reconfirm a relationship, constant, or outcome that is:
@@ -570,7 +570,7 @@ export const CHEMISTRY_IDEA_CONFIG_JSON = `{
   },
   "ib_chemistry_syllabus_specification": {
     "Structure": {
-      "Structure_1": {
+      "Structure 1": {
         "1.1 Models of the particulate nature of matter": {
           "includes": ["elements, compounds and mixtures", "physical separation techniques", "homogeneous vs heterogeneous mixtures", "kinetic molecular theory", "states of matter and changes of state", "temperature as average kinetic energy"]
         },
@@ -587,7 +587,7 @@ export const CHEMISTRY_IDEA_CONFIG_JSON = `{
           "includes": ["ideal gas assumptions", "real vs ideal gas behavior", "gas laws relationships", "ideal gas equation"]
         }
       },
-      "Structure_2": {
+      "Structure 2": {
         "2.1 The ionic model": {
           "includes": ["ion formation", "ionic bonding", "lattice structures", "physical properties of ionic compounds"]
         },
@@ -601,7 +601,7 @@ export const CHEMISTRY_IDEA_CONFIG_JSON = `{
           "includes": ["bonding continuum", "bonding triangle", "polymers", "alloys as mixtures", "material properties from structure"]
         }
       },
-      "Structure_3": {
+      "Structure 3": {
         "3.1 The periodic table: Classification of elements": {
           "includes": ["periodic trends", "oxidation states", "transition elements", "electrode potentials", "periodicity explanations"]
         },
@@ -611,7 +611,7 @@ export const CHEMISTRY_IDEA_CONFIG_JSON = `{
       }
     },
     "Reactivity": {
-      "Reactivity_1": {
+      "Reactivity 1": {
         "1.1 Measuring enthalpy changes": {
           "includes": ["endothermic and exothermic reactions", "calorimetry", "enthalpy change calculations"]
         },
@@ -625,7 +625,7 @@ export const CHEMISTRY_IDEA_CONFIG_JSON = `{
           "includes": ["entropy", "Gibbs free energy", "temperature dependence of spontaneity", "equilibrium and Gibbs energy"]
         }
       },
-      "Reactivity_2": {
+      "Reactivity 2": {
         "2.1 Amount of chemical change": {
           "includes": ["stoichiometry", "limiting reactants", "percentage yield", "atom economy"]
         },
@@ -636,7 +636,7 @@ export const CHEMISTRY_IDEA_CONFIG_JSON = `{
           "includes": ["dynamic equilibrium", "equilibrium constants", "Le Châtelier's principle", "reaction quotient", "Gibbs free energy and equilibrium"]
         }
       },
-      "Reactivity_3": {
+      "Reactivity 3": {
         "3.1 Proton transfer reactions": {
           "includes": ["acids and bases", "pH and pOH", "buffers", "titration curves", "acid–base equilibria"]
         },

@@ -64,14 +64,24 @@ const NavIcons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
     </svg>
   ),
+  insights: (
+    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+  ),
+  notes: (
+    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+    </svg>
+  ),
 };
 
 const flatNavIcons = {
-  'Overview': 'home',
+  'Home': 'home',
   'Schools': 'folder',
   'Reports': 'clipboard',
   'Subjects': 'book',
-  'Materials': 'folder',
+  'Fundamentals': 'folder',
   'AI Prompts': 'lightbulb',
   'Users': 'folder',
   'Classes': 'clipboard',
@@ -82,17 +92,17 @@ const flatNavIcons = {
 };
 
 const superAdminNav = [
-  { to: '/dashboard', label: 'Overview' },
+  { to: '/dashboard', label: 'Home' },
   { to: '/schools', label: 'Schools' },
   { to: '/reports', label: 'Reports' },
   { to: '/subjects', label: 'Subjects' },
-  { to: '/materials', label: 'Materials' },
+  { to: '/materials', label: 'Fundamentals' },
   { to: '/ai-prompts', label: 'AI Prompts' },
   { to: '/users', label: 'Users' },
 ];
 
 const schoolAdminNav = [
-  { to: '/dashboard', label: 'Overview' },
+  { to: '/dashboard', label: 'Home' },
   { to: '/subjects', label: 'Subjects' },
   { to: '/classes', label: 'Classes' },
   { to: '/users', label: 'Users' },
@@ -102,7 +112,7 @@ const schoolAdminNav = [
 ];
 
 const teacherNav = [
-  { to: '/dashboard', label: 'Overview' },
+  { to: '/dashboard', label: 'Home' },
   { to: '/subjects', label: 'Subjects' },
   { to: '/classes', label: 'Classes' },
   { to: '/ai/flash-cards', label: 'Flash Cards' },
@@ -112,28 +122,36 @@ const teacherNav = [
 
 /** Student nav: main links + optional subject section with icons and grouping */
 const studentNavMain = [
-  { to: '/dashboard', label: 'Overview', end: true, icon: 'home' },
-  { to: '/content', label: 'My content', end: true, icon: 'folder' },
+  { to: '/dashboard', label: 'Home', end: true, icon: 'home' },
+  { to: '/content', label: 'Modules', end: true, icon: 'folder' },
 ];
 
-const studentSubjectTabs = [
-  { toPath: 'materials', label: 'Materials', icon: 'book' },
+const studentSubjectTabsTop = [
+  { toPath: 'materials', label: 'Fundamentals', icon: 'book' },
+  { toPath: 'notes', label: 'Notes', icon: 'notes' },
   { toPath: 'quizzes', label: 'Quizzes', icon: 'clipboard' },
   { toPath: 'flash-cards', label: 'Flash cards', icon: 'cards' },
-  { toPath: 'ideas', label: 'Ideas', icon: 'lightbulb' },
-  { toPath: 'study-and-learn', label: 'Study and Learn', icon: 'chat' },
-  { toPath: 'feynman', label: 'Feynman', icon: 'feynman' },
-  { toPath: 'feedback', label: 'Internal Assessment', icon: 'fileCheck' },
+  { toPath: 'insights', label: 'Insights', icon: 'insights' },
+];
+
+const studentSubjectTabsInternalAssessment = [
+  { toPath: 'feedback', label: 'Feedback Generator', icon: 'fileCheck' },
+  { toPath: 'ideas', label: 'Idea Generation', icon: 'lightbulb' },
+  { toPath: 'study-and-learn', label: 'Study Lab', icon: 'chat' },
+  { toPath: 'feynman', label: 'Teach & Learn', icon: 'feynman' },
 ];
 
 function getStudentSubjectNav(subjectId) {
   if (!subjectId) return { main: studentNavMain, subjectId: null };
   const base = `/content/subject/${subjectId}`;
+  const topTabs = studentSubjectTabsTop.map((t) => ({ ...t, to: `${base}/${t.toPath}`, end: false }));
+  const iaTabs = studentSubjectTabsInternalAssessment.map((t) => ({ ...t, to: `${base}/${t.toPath}`, end: false }));
   return {
     main: studentNavMain,
     subjectId,
     subjectBase: base,
-    subjectTabs: studentSubjectTabs.map((t) => ({ ...t, to: `${base}/${t.toPath}`, end: false })),
+    subjectTabsTop: topTabs,
+    subjectTabsInternalAssessment: iaTabs,
   };
 }
 
@@ -147,6 +165,101 @@ function getNav(role, location) {
     return { type: 'student', ...getStudentSubjectNav(subjectId) };
   }
   return { type: 'flat', items: studentNavMain };
+}
+
+/** Student sidebar: Back to Modules, top tabs (Fundamentals, Quizzes, Flash cards), Internal Assessment dropdown. */
+function StudentSubjectNav({ subjectBase, subjectTabsTop, subjectTabsInternalAssessment, onNavigate, location, NavIcons, NavLink, Link }) {
+  const pathname = location?.pathname || '';
+  const isInternalAssessmentActive = subjectTabsInternalAssessment?.some((t) => pathname === t.to || pathname.startsWith(t.to + '/'));
+  const [internalAssessmentOpen, setInternalAssessmentOpen] = useState(isInternalAssessmentActive);
+  useEffect(() => {
+    if (isInternalAssessmentActive) setInternalAssessmentOpen(true);
+  }, [isInternalAssessmentActive]);
+
+  const isOpen = internalAssessmentOpen || isInternalAssessmentActive;
+
+  return (
+    <div className="space-y-0.5 mt-6">
+      <span className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-examia-soft/70">
+        In this subject
+      </span>
+      <Link
+        to="/content"
+        onClick={onNavigate}
+        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-examia-soft hover:bg-white/10 hover:text-white transition-all duration-200"
+      >
+        {NavIcons.arrowLeft}
+        <span>Back to Modules</span>
+      </Link>
+      {subjectTabsTop?.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={false}
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] transition-all duration-200 ${
+              isActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
+            }`
+          }
+          onClick={onNavigate}
+        >
+          {item.icon && NavIcons[item.icon]}
+          <span>{item.label}</span>
+        </NavLink>
+      ))}
+      <div className="pt-0.5">
+        <button
+          type="button"
+          onClick={() => setInternalAssessmentOpen((o) => !o)}
+          className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[15px] transition-all duration-200 text-left ${
+            isInternalAssessmentActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
+          }`}
+        >
+          {NavIcons.fileCheck}
+          <span>Internal Assessment</span>
+          <svg
+            className={`w-4 h-4 ml-auto shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <AnimatePresence initial={false}>
+          {isOpen && subjectTabsInternalAssessment?.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="pl-8 pr-2 py-1 space-y-0.5">
+                {subjectTabsInternalAssessment.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={false}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2 px-3 py-2 rounded-lg text-[14px] transition-all duration-200 ${
+                        isActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
+                      }`
+                    }
+                    onClick={onNavigate}
+                  >
+                    {item.icon && NavIcons[item.icon]}
+                    <span>{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
 }
 
 export function DashboardLayout() {
@@ -218,35 +331,16 @@ export function DashboardLayout() {
                 ))}
               </div>
               {nav.subjectId && (
-                <div className="space-y-0.5 mt-6">
-                  <span className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-examia-soft/70">
-                    In this subject
-                  </span>
-                  <Link
-                    to="/content"
-                    onClick={() => setSidebarOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-examia-soft hover:bg-white/10 hover:text-white transition-all duration-200"
-                  >
-                    {NavIcons.arrowLeft}
-                    <span>Back to My content</span>
-                  </Link>
-                  {nav.subjectTabs.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={false}
-                      className={({ isActive }) =>
-                        `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] transition-all duration-200 ${
-                          isActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
-                        }`
-                      }
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      {item.icon && NavIcons[item.icon]}
-                      <span>{item.label}</span>
-                    </NavLink>
-                  ))}
-                </div>
+                <StudentSubjectNav
+                  subjectBase={nav.subjectBase}
+                  subjectTabsTop={nav.subjectTabsTop}
+                  subjectTabsInternalAssessment={nav.subjectTabsInternalAssessment}
+                  onNavigate={() => setSidebarOpen(false)}
+                  location={location}
+                  NavIcons={NavIcons}
+                  NavLink={NavLink}
+                  Link={Link}
+                />
               )}
             </>
           ) : (
@@ -257,7 +351,7 @@ export function DashboardLayout() {
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    end={item.to === '/dashboard'}
+                    end={item.to === '/dashboard' || item.label === 'Home'}
                     className={({ isActive }) =>
                       `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] transition-all duration-200 ${
                         isActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'

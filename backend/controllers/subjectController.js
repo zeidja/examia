@@ -4,6 +4,7 @@ import { getMaterialsFolderNames } from '../services/materialsService.js';
 const CODE_MAP = {
   Biology: 'BIO',
   Business: 'BM',
+  Chemistry: 'CHEM',
   Economics: 'ECON',
   GlobalPolitics: 'GP',
   Math: 'MATH',

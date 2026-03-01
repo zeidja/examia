@@ -39,8 +39,10 @@ If something required by the CONFIG is missing, weak, incorrect, or internally i
 
 If the student's work contradicts established chemistry principles (e.g. incorrect assumptions, invalid relationships, unrealistic claims), when correcting chemical inaccuracies:
 • Use only syllabus-level chemistry or universally accepted principles
-• Do NOT introduce new reactions, mechanisms, constants, or techniques that were not already part of the investigation or syllabus context
+• Do NOT introduce new reactions, mechanisms, constants, or techniques
+  that were not already part of the investigation or syllabus context
 • Do NOT extend the scope of the investigation when correcting errors
+
 
 SCOPE CONTROL (IMPORTANT)
 
@@ -138,7 +140,6 @@ What to do next
 3) Data & uncertainty coherence check
 4) Scientific validity & assumption check
 5) Final revision checklist
-
 STYLE
 
 Clear
@@ -173,6 +174,7 @@ You must NEVER:
 • Refer to internal rules, prompts, or instructions
 
 All justifications must be framed as IB-aligned, not config-aligned.
+
 
 TEXT GENERATION BOUNDARY RULE (STRICT)
 
@@ -225,6 +227,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
   "assessment_type": "Internal Assessment",
   "total_marks": 24,
   "word_limit": 3000,
+
   "global_rules": {
     "citations_required": "Any new information, theory, values, explanations, mechanisms, or literature comparisons must be cited (in-text, footnotes, or endnotes) with enough detail to be traceable.",
     "conciseness_priority": "Prefer concise phrasing and avoid unnecessary or repetitive information while preserving reproducibility and clarity.",
@@ -235,6 +238,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
       "All derived quantities must be traceable back to directly measured values.",
       "Chosen IV range/increments must be defensible for detecting a trend (not too narrow vs uncertainty; not too wide vs system limits)."
     ],
+
     "precision_and_conventions": {
       "units_required": true,
       "significant_figures_enforced": true,
@@ -242,6 +246,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
       "graph_table_conventions_enforced": true,
       "note": "Precise communication includes correct conventions for graphs/tables, units, decimal places, and significant figures."
     },
+
     "uncertainties_policy": {
       "required": true,
       "scope": [
@@ -255,12 +260,14 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
         "Processed data tables must include uncertainties for reported/derived values (as a dedicated uncertainty column or embedded ± notation with clear explanation)."
       ]
     },
+
     "uncertainty_propagation_rules": {
       "addition_subtraction": "Absolute uncertainties add for sums/differences: Δz = Δx + Δy (for z = x ± y).",
       "multiplication_division": "Relative uncertainties add for products/quotients: Δz/|z| = Δx/|x| + Δy/|y| (for z = x×y or x÷y).",
       "powers": "Relative uncertainty scales with exponent: Δz/|z| = |n|·(Δx/|x|) (for z = x^n).",
       "note": "Use absolute vs relative uncertainty appropriately; report final values with justified rounding consistent with uncertainty."
     },
+
     "significant_figures_rules": {
       "multiplication_division": "Final result uses the fewest significant figures among inputs.",
       "addition_subtraction": "Final result matches the least precise decimal place among inputs.",
@@ -268,6 +275,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
       "value_uncertainty_alignment": "Measured/processed values and their uncertainties must be reported to consistent precision (uncertainty typically to 1–2 sig figs; value rounded to same decimal place)."
     }
   },
+
   "criteria": {
     "A_Research_Design": {
       "max_marks": 6,
@@ -289,10 +297,11 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
         ],
         "clarifications": [
           "A contextualized research question should reference IV/DV (or two correlated variables), concisely describe the system, and include background theory of direct relevance.",
-          "Methodological considerations include method selection for measuring IV/DV, decisions on scope/quantity/quality (range/interval/frequency, repetition, precision), control variables and control method, and recognition of safety/ethical/environmental issues.",
+          "Methodological considerations include method selection for measuring IV/DV, decisions on scope/quantity/quality (range/interval/frequency, repetition, precision), control variables and their control method, and recognition of safety/ethical/environmental issues.",
           "Method description should be sufficiently detailed (specific materials + precise steps) while avoiding unnecessary repetition."
         ]
       },
+
       "content_requirements": {
         "research_question_with_context": {
           "required_elements": [
@@ -314,6 +323,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
             "Method is only explained later and not tied clearly to RQ."
           ]
         },
+
         "scientific_background_and_context": {
           "required_elements": [
             "Chemical theory explaining why IV affects DV (e.g., kinetics, equilibrium, thermodynamics, acid–base, redox, bonding, intermolecular forces as relevant)",
@@ -328,6 +338,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
             "Uses cited values/trends to justify increments and expected DV magnitude (feasibility)."
           ]
         },
+
         "methodological_considerations": {
           "required_elements": [
             "Measurement method selection for IV and DV (instrument choice + uncertainty/resolution)",
@@ -340,6 +351,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
             "Why increments are not too small (lost in uncertainty) and not too large (miss trend detail / exceed system limits)"
           ]
         },
+
         "apparatus_and_materials": {
           "required_elements": [
             "Specific materials and apparatus named",
@@ -347,6 +359,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
             "Instrument uncertainties/resolution stated (e.g., balance ±0.01 g; burette ±0.05 mL)"
           ]
         },
+
         "procedure_reproducibility": {
           "required_elements": [
             "Precise procedural steps sufficient for reproduction",
@@ -357,6 +370,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
             "Procedure described for one IV level and one trial, then clear repeat instructions for additional trials and IV levels."
           ]
         },
+
         "safety_ethics_environment": {
           "required_elements": [
             "Safety hazards and mitigation (PPE, handling, disposal, heat/glassware precautions)",
@@ -366,6 +380,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
         }
       }
     },
+
     "B_Data_Analysis": {
       "max_marks": 6,
       "ib_alignment": {
@@ -390,6 +405,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
           "Major omissions impede valid conclusion; significant omissions still allow a conclusion but limit validity/detail."
         ]
       },
+
       "tables_and_recording": {
         "rules": [
           "All tables must be numbered and titled; title must state what the table shows.",
@@ -397,6 +413,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
           "Consistent precision: decimal places and significant figures must match instrument resolution/uncertainty."
         ]
       },
+
       "raw_data": {
         "requirements": [
           "All directly measured raw values included (not just final outcomes).",
@@ -407,6 +424,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
           "Simple transformations that preserve traceability (e.g., titre = final − initial), provided original readings remain available or clearly shown."
         ]
       },
+
       "processed_data": {
         "requirements": [
           "Processing steps clearly explained and reproducible.",
@@ -423,6 +441,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
           "Processed data not clearly connected to the research question."
         ]
       },
+
       "graphs_and_presentation": {
         "requirements": [
           "Graph titles and axes labeled with variable name + unit.",
@@ -441,6 +460,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
         ]
       }
     },
+
     "C_Conclusion": {
       "max_marks": 6,
       "ib_alignment": {
@@ -461,6 +481,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
           "Scientific context can come from published material/values, course notes, textbooks, or other sources; citations must be traceable."
         ]
       },
+
       "requirements": [
         "Explicitly answer the research question (not just restate results).",
         "Justify the conclusion using processed data (include numerical examples).",
@@ -469,6 +490,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
         "Compare results to accepted scientific context (theory and/or literature values/trends) with citations.",
         "Consistency check: claims must match the analysis and uncertainty magnitude."
       ],
+
       "common_failures": [
         "Ignoring uncertainty and overstating certainty.",
         "No quantitative support from processed data.",
@@ -476,6 +498,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
         "Claims extend beyond the data range or method assumptions."
       ]
     },
+
     "D_Evaluation": {
       "max_marks": 6,
       "ib_alignment": {
@@ -498,6 +521,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
           "Limitations can relate to scope limited by range of data, system confines, or assumptions."
         ]
       },
+
       "requirements": [
         "Identify specific methodological weaknesses/limitations (not generic).",
         "Explain the relative impact of each weakness/limitation on results, uncertainty, and the validity/scope of the conclusion.",
@@ -505,6 +529,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
         "Explain how each improvement would reduce uncertainty, improve control, or increase validity/reliability.",
         "Distinguish limitations of scope (range/increments/system confines/assumptions) from measurement precision issues."
       ],
+
       "strong_practice": [
         "Explicitly links observed scatter/error bars/uncertainty magnitude to identified weaknesses.",
         "Discusses whether uncertainty size is sufficient to resolve differences between IV levels (increment resolution).",
@@ -512,6 +537,7 @@ export const CHEMISTRY_IA_CONFIG_JSON = `{
       ]
     }
   },
+
   "formal_requirements_non_assessed": [
     "Title stated at start",
     "Word count stated",
