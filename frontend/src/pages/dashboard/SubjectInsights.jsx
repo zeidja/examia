@@ -3,7 +3,7 @@ import { useParams, useOutletContext } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 
-/** Student insights for a subject: quiz scores, flash card ratings, wrong-answer bank. */
+/** Student insights for a subject: quiz scores, flashcard ratings, wrong-answer bank. */
 export function SubjectInsights() {
   const { subjectId } = useParams();
   const { subject } = useOutletContext() || {};
@@ -121,10 +121,10 @@ export function SubjectInsights() {
           <span className="w-8 h-8 rounded-lg bg-examia-dark/10 flex items-center justify-center">
             <svg className="w-4 h-4 text-examia-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
           </span>
-          Flash cards — how you rated them
+          Flashcards — how you rated them
         </h3>
         {totalFlash === 0 ? (
-          <p className="text-examia-mid text-sm">No flash card ratings yet. Study flash cards and rate them (Easy / Medium / Hard) to see your distribution here.</p>
+          <p className="text-examia-mid text-sm">No flashcard ratings yet. Study flashcards and rate them (Easy / Medium / Hard) to see your distribution here.</p>
         ) : (
           <>
             <div className="flex flex-wrap gap-4 mb-4">

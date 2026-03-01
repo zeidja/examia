@@ -5,12 +5,12 @@ import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { showError, showConfirm } from '../../utils/swal';
 
-const typeLabels = { material: 'Material', quiz: 'Quiz', flash_cards: 'Flash cards' };
+const typeLabels = { material: 'Material', quiz: 'Quiz', flash_cards: 'Flashcards' };
 
 const typeFilters = [
   { id: '', label: 'All' },
   { id: 'quiz', label: 'Quiz' },
-  { id: 'flash_cards', label: 'Flash cards' },
+  { id: 'flash_cards', label: 'Flashcards' },
   { id: 'material', label: 'Fundamentals' },
 ];
 
@@ -151,7 +151,7 @@ export function TeacherResources() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-examia-dark">Resources</h1>
           <p className="text-examia-mid mt-1 text-sm">
-            {me?.role === 'teacher' ? 'Create and publish quizzes, flash cards, and materials. Students see published items in Modules.' : 'Manage and publish resources for your school.'}
+            {me?.role === 'teacher' ? 'Create and publish quizzes, flashcards, and materials. Students see published items in Modules.' : 'Manage and publish resources for your school.'}
           </p>
         </div>
         {me?.role === 'teacher' && (
@@ -337,7 +337,7 @@ export function TeacherResources() {
           </p>
           <p className="text-examia-mid text-sm mt-1">
             {resources.length === 0
-              ? 'Generate quizzes or flash cards from AI Tools and save them here, or upload a material.'
+              ? 'Generate quizzes or flashcards from AI Tools and save them here, or upload a material.'
               : typeFilter === 'quiz'
                 ? 'Switch to All or another type.'
                 : typeFilter === 'flash_cards'

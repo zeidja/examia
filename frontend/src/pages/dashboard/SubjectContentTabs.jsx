@@ -79,7 +79,27 @@ function MessageContent({ content, className = '' }) {
   );
 }
 
-const typeLabels = { material: 'Material', quiz: 'Quiz', flash_cards: 'Flash cards' };
+const typeLabels = { material: 'Material', quiz: 'Quiz', flash_cards: 'Flashcards' };
+
+/** Subject card colors — same order as Materials/Notes so subject color is consistent. */
+const SUBJECT_CARD_STYLES = [
+  { card: 'bg-amber-50 border-amber-200/60 shadow-[0_4px_14px_rgba(245,158,11,0.2)] hover:shadow-[0_8px_24px_rgba(245,158,11,0.28)]', badge: 'bg-amber-100 text-amber-800' },
+  { card: 'bg-emerald-50 border-emerald-200/60 shadow-[0_4px_14px_rgba(16,185,129,0.2)] hover:shadow-[0_8px_24px_rgba(16,185,129,0.28)]', badge: 'bg-emerald-100 text-emerald-800' },
+  { card: 'bg-blue-50 border-blue-200/60 shadow-[0_4px_14px_rgba(59,130,246,0.2)] hover:shadow-[0_8px_24px_rgba(59,130,246,0.28)]', badge: 'bg-blue-100 text-blue-800' },
+  { card: 'bg-violet-50 border-violet-200/60 shadow-[0_4px_14px_rgba(139,92,246,0.2)] hover:shadow-[0_8px_24px_rgba(139,92,246,0.28)]', badge: 'bg-violet-100 text-violet-800' },
+  { card: 'bg-rose-50 border-rose-200/60 shadow-[0_4px_14px_rgba(244,63,94,0.2)] hover:shadow-[0_8px_24px_rgba(244,63,94,0.28)]', badge: 'bg-rose-100 text-rose-800' },
+  { card: 'bg-cyan-50 border-cyan-200/60 shadow-[0_4px_14px_rgba(6,182,212,0.2)] hover:shadow-[0_8px_24px_rgba(6,182,212,0.28)]', badge: 'bg-cyan-100 text-cyan-800' },
+  { card: 'bg-orange-50 border-orange-200/60 shadow-[0_4px_14px_rgba(249,115,22,0.2)] hover:shadow-[0_8px_24px_rgba(249,115,22,0.28)]', badge: 'bg-orange-100 text-orange-800' },
+  { card: 'bg-teal-50 border-teal-200/60 shadow-[0_4px_14px_rgba(20,184,166,0.2)] hover:shadow-[0_8px_24px_rgba(20,184,166,0.28)]', badge: 'bg-teal-100 text-teal-800' },
+];
+
+function getSubjectStyleIndex(subjectName) {
+  if (!subjectName || typeof subjectName !== 'string') return 0;
+  const n = subjectName.toLowerCase().trim();
+  const order = ['biology', 'chemistry', 'math', 'economics', 'business', 'physics', 'psychology', 'global politics', 'politics'];
+  const i = order.findIndex((key) => n.includes(key));
+  return i >= 0 ? i % SUBJECT_CARD_STYLES.length : 0;
+}
 
 /** Summary from student ratings: { easy, medium, hard } */
 function FlashCardSummaryPills({ summary }) {
@@ -105,15 +125,18 @@ function FlashCardSummaryPills({ summary }) {
   );
 }
 
-function ResourceCard({ r, openFile, flashCardSummary }) {
+function ResourceCard({ r, openFile, flashCardSummary, cardStyle }) {
+  const baseClass = 'rounded-xl p-4 shadow-sm border';
+  const className = cardStyle ? `${baseClass} ${cardStyle.card}` : `${baseClass} bg-white border-examia-soft/30`;
+  const badgeClass = cardStyle ? `text-xs font-medium px-2 py-1 rounded ${cardStyle.badge}` : 'text-xs font-medium text-examia-mid bg-examia-soft/20 px-2 py-1 rounded';
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-xl p-4 shadow-sm border border-examia-soft/30"
+      className={className}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-examia-mid bg-examia-soft/20 px-2 py-1 rounded">{typeLabels[r.type] || r.type}</span>
+        <span className={badgeClass}>{typeLabels[r.type] || r.type}</span>
         {r.type === 'quiz' && r.hasAttempt && (
           <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
             Done
@@ -141,7 +164,7 @@ function ResourceCard({ r, openFile, flashCardSummary }) {
         )}
         {r.type === 'quiz' && (
           <Link
-            to={`/content/${r._id}`}
+            to={r._subjectId ? `/content/subject/${r._subjectId}/resource/${r._id}` : `/content/${r._id}`}
             className="px-3 py-1.5 rounded-lg bg-examia-dark text-white text-sm font-medium hover:bg-examia-mid"
           >
             {r.hasAttempt ? 'See result' : 'Attempt now'}
@@ -149,7 +172,7 @@ function ResourceCard({ r, openFile, flashCardSummary }) {
         )}
         {r.type === 'flash_cards' && (
           <Link
-            to={`/content/${r._id}`}
+            to={r._subjectId ? `/content/subject/${r._subjectId}/resource/${r._id}` : `/content/${r._id}`}
             className="px-3 py-1.5 rounded-lg bg-examia-dark text-white text-sm font-medium hover:bg-examia-mid"
           >
             Study
@@ -235,15 +258,17 @@ export function SubjectMaterials() {
 }
 
 export function SubjectQuizzes() {
-  const { resources } = useOutletContext() || {};
-  const quizzes = (resources || []).filter((r) => r.type === 'quiz');
+  const { subjectId, resources, subject } = useOutletContext() || {};
+  const quizzes = (resources || []).filter((r) => r.type === 'quiz').map((r) => ({ ...r, _subjectId: subjectId }));
   const openFile = () => {};
+  const styleIndex = getSubjectStyleIndex(subject?.name);
+  const cardStyle = SUBJECT_CARD_STYLES[styleIndex];
 
   return (
     <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
       <h2 className="text-lg font-semibold text-examia-dark mb-3">Quizzes</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {quizzes.map((r) => <ResourceCard key={r._id} r={r} openFile={openFile} />)}
+        {quizzes.map((r) => <ResourceCard key={r._id} r={r} openFile={openFile} cardStyle={cardStyle} />)}
       </div>
       {quizzes.length === 0 && <p className="text-examia-mid text-sm">No quizzes for this subject yet.</p>}
     </motion.section>
@@ -251,11 +276,13 @@ export function SubjectQuizzes() {
 }
 
 export function SubjectFlashCards() {
-  const { resources } = useOutletContext() || {};
+  const { subjectId, resources, subject } = useOutletContext() || {};
   const { user } = useAuth();
-  const flashcards = (resources || []).filter((r) => r.type === 'flash_cards');
+  const flashcards = (resources || []).filter((r) => r.type === 'flash_cards').map((r) => ({ ...r, _subjectId: subjectId }));
   const [flashCardSummaries, setFlashCardSummaries] = useState({});
   const openFile = () => {};
+  const styleIndex = getSubjectStyleIndex(subject?.name);
+  const cardStyle = SUBJECT_CARD_STYLES[styleIndex];
 
   const flashCardIds = useMemo(() => flashcards.map((f) => f._id), [flashcards]);
   useEffect(() => {
@@ -278,7 +305,7 @@ export function SubjectFlashCards() {
 
   return (
     <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-      <h2 className="text-lg font-semibold text-examia-dark mb-3">Flash cards</h2>
+      <h2 className="text-lg font-semibold text-examia-dark mb-3">Flashcards</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {flashcards.map((r) => (
           <ResourceCard
@@ -286,10 +313,11 @@ export function SubjectFlashCards() {
             r={r}
             openFile={openFile}
             flashCardSummary={user?.role === 'student' ? flashCardSummaries[r._id] : undefined}
+            cardStyle={cardStyle}
           />
         ))}
       </div>
-      {flashcards.length === 0 && <p className="text-examia-mid text-sm">No flash cards for this subject yet.</p>}
+      {flashcards.length === 0 && <p className="text-examia-mid text-sm">No flashcards for this subject yet.</p>}
     </motion.section>
   );
 }

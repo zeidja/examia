@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 
-const typeLabels = { material: 'Material', quiz: 'Quiz', flash_cards: 'Flash cards' };
+const typeLabels = { material: 'Material', quiz: 'Quiz', flash_cards: 'Flashcards' };
 
 /** Subject icon keys for mapping name/materialsPath → icon. Local: /subject-icons/{key}.png; fallback: Flaticon CDN. */
 const SUBJECT_ICON_KEYS = {
@@ -94,7 +94,7 @@ export function MyContent() {
       >
         <div className="mb-10">
           <h1 className="text-3xl font-bold tracking-tight text-examia-dark">Modules</h1>
-          <p className="text-examia-mid mt-2 text-sm">Choose a subject to view fundamentals, quizzes, flash cards, get ideas, and submit work for AI feedback.</p>
+          <p className="text-examia-mid mt-2 text-sm">Choose a subject to view fundamentals, quizzes, flashcards, get ideas, and submit work for AI feedback.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {subjects.map((s, i) => {
@@ -138,14 +138,6 @@ export function MyContent() {
             );
           })}
         </div>
-        {subjects.length > 0 && (
-          <p className="mt-6 text-center text-xs text-examia-mid">
-            Subject icons from{' '}
-            <a href="https://www.flaticon.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-examia-dark">
-              Flaticon
-            </a>
-          </p>
-        )}
         {subjects.length === 0 && (
           <div className="rounded-2xl border-2 border-dashed border-examia-soft/40 bg-examia-soft/5 p-12 text-center">
             <div className="w-14 h-14 rounded-2xl bg-examia-soft/20 flex items-center justify-center mx-auto mb-4 text-examia-mid">
@@ -174,7 +166,7 @@ export function MyContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-examia-dark">Modules</h1>
           <p className="text-examia-mid mt-1 text-sm">
-            {isTeacher && 'Published quizzes, flash cards, and fundamentals you created.'}
+            {isTeacher && 'Published quizzes, flashcards, and fundamentals you created.'}
             {(isSchoolAdmin || isSuperAdmin) && 'All published resources in your school or platform.'}
           </p>
         </div>
@@ -230,7 +222,7 @@ export function MyContent() {
         <div className="rounded-2xl border-2 border-dashed border-examia-soft/40 bg-examia-soft/5 p-12 text-center">
           <p className="font-semibold text-examia-dark">No content yet</p>
           <p className="text-examia-mid text-sm mt-1">
-            {isTeacher ? 'Create quizzes and flash cards in AI Tools, then publish them from Resources.' : 'Quizzes and materials will appear here when teachers publish them.'}
+            {isTeacher ? 'Create quizzes and flashcards in AI Tools, then publish them from Resources.' : 'Quizzes and materials will appear here when teachers publish them.'}
           </p>
           {isTeacher && (
             <Link to="/resources" className="inline-block mt-4 text-sm font-medium text-examia-mid hover:text-examia-dark transition">Go to Resources →</Link>

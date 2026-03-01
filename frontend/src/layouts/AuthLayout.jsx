@@ -20,7 +20,7 @@ export function AuthLayout() {
             IB E-Learning Platform
           </h1>
           <p className="text-examia-soft text-base xl:text-lg leading-relaxed">
-            Flash cards, quizzes, TOK, and assessments powered by AI — built for IB schools.
+            Flashcards, quizzes, TOK, and assessments powered by AI — built for IB schools.
           </p>
         </div>
         <p className="text-examia-soft/70 text-sm">© Examia. For schools using the IB system.</p>

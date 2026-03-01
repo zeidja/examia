@@ -45,7 +45,7 @@ export function FlashCardReport() {
       .then((r) => {
         setStats(r.data.stats || []);
         setStudents(r.data.students || []);
-        setResourceTitle(r.data.resourceTitle || 'Flash cards');
+        setResourceTitle(r.data.resourceTitle || 'Flashcards');
       })
       .catch((err) => setError(err.response?.data?.message || err.message || 'Failed to load stats'))
       .finally(() => setLoading(false));
@@ -75,7 +75,7 @@ export function FlashCardReport() {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
       <Link to="/resources" className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to My resources</Link>
-      <h1 className="text-2xl font-bold text-examia-dark mb-2">Flash card report: {resourceTitle}</h1>
+      <h1 className="text-2xl font-bold text-examia-dark mb-2">Flashcard report: {resourceTitle}</h1>
       <p className="text-examia-mid mb-8">
         How students rated each card (Easy / Medium / Hard). View totals, per-card breakdown, and per-student progress.
       </p>
@@ -125,7 +125,7 @@ export function FlashCardReport() {
             <section className="bg-white rounded-2xl border border-examia-soft/30 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-examia-soft/30 bg-examia-soft/10">
                 <h2 className="text-lg font-bold text-examia-dark">By card</h2>
-                <p className="text-sm text-examia-mid mt-0.5">Rating counts per flash card</p>
+                <p className="text-sm text-examia-mid mt-0.5">Rating counts per flashcard</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left">

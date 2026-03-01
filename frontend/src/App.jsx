@@ -31,6 +31,8 @@ import { SubjectInsights } from './pages/dashboard/SubjectInsights';
 import { SubjectNotesList } from './pages/dashboard/SubjectNotesList';
 import { LessonStudyPage } from './pages/dashboard/LessonStudyPage';
 import { NotesLanding } from './pages/dashboard/NotesLanding';
+import { FlashcardsLanding } from './pages/dashboard/FlashcardsLanding';
+import { QuizzesLanding } from './pages/dashboard/QuizzesLanding';
 import { ContentView } from './pages/dashboard/ContentView';
 import { TeacherResources } from './pages/dashboard/TeacherResources';
 import { QuizReport } from './pages/dashboard/QuizReport';
@@ -71,11 +73,14 @@ function AppRoutes() {
         <Route path="ai/:tabId" element={<AITools />} />
         <Route path="content" element={<MyContent />} />
         <Route path="content/notes" element={<NotesLanding />} />
+        <Route path="content/flashcards" element={<FlashcardsLanding />} />
+        <Route path="content/quizzes" element={<QuizzesLanding />} />
         <Route path="content/subject/:subjectId" element={<SubjectContentLayout />}>
           <Route index element={<Navigate to="materials" replace />} />
           <Route path="materials" element={<SubjectMaterials />} />
           <Route path="notes" element={<SubjectNotesList />} />
           <Route path="lesson/:noteId/study" element={<LessonStudyPage />} />
+          <Route path="resource/:resourceId" element={<ContentView />} />
           <Route path="definitions" element={<ComingSoonPage title="Definitions" />} />
           <Route path="command-terms" element={<ComingSoonPage title="Command Terms" />} />
           <Route path="checklists" element={<ComingSoonPage title="Check Lists" />} />

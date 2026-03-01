@@ -141,7 +141,7 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Student: Quick actions + New quizzes + Flash cards */}
+      {/* Student: Quick actions + New quizzes + Flashcards */}
       {user?.role === 'student' && (
         <>
           <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-examia-soft/20 mb-8">
@@ -163,14 +163,14 @@ export function Dashboard() {
                 Note taking
               </Link>
               <Link
-                to="/content"
+                to="/content/flashcards"
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-examia-soft/40 text-examia-dark font-medium hover:bg-examia-soft/15 hover:border-examia-soft/50 transition"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                Flash cards
+                Flashcards
               </Link>
               <Link
-                to="/content"
+                to="/content/quizzes"
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-examia-soft/40 text-examia-dark font-medium hover:bg-examia-soft/15 hover:border-examia-soft/50 transition"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
@@ -199,7 +199,7 @@ export function Dashboard() {
                     {quizzes.map((q, i) => (
                       <Link
                         key={q._id}
-                        to={`/content/${q._id}`}
+                        to={q.subject?._id ? `/content/subject/${q.subject._id}/resource/${q._id}` : `/content/${q._id}`}
                         className="flex items-center justify-between gap-3 p-4 rounded-xl border border-examia-soft/25 hover:border-examia-soft/50 hover:bg-examia-soft/5 transition-all duration-200 group"
                       >
                         <div className="min-w-0 flex-1">
@@ -223,13 +223,13 @@ export function Dashboard() {
                   transition={{ duration: 0.3, delay: 0.05 }}
                   className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-examia-soft/20"
                 >
-                  <h2 className="text-lg font-semibold text-examia-dark mb-1">Flash cards</h2>
+                  <h2 className="text-lg font-semibold text-examia-dark mb-1">Flashcards</h2>
                   <p className="text-examia-mid text-sm mb-5">Study and rate cards by difficulty.</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {flashCards.map((fc) => (
                       <Link
                         key={fc._id}
-                        to={`/content/${fc._id}`}
+                        to={fc.subject?._id ? `/content/subject/${fc.subject._id}/resource/${fc._id}` : `/content/${fc._id}`}
                         className="flex items-center justify-between gap-3 p-4 rounded-xl border border-examia-soft/25 hover:border-examia-soft/50 hover:bg-examia-soft/5 transition-all duration-200 group"
                       >
                         <div className="min-w-0 flex-1">
@@ -252,7 +252,7 @@ export function Dashboard() {
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-white rounded-2xl p-8 shadow-sm border border-examia-soft/20 text-center"
                 >
-                  <p className="font-semibold text-examia-dark">No quizzes or flash cards yet</p>
+                  <p className="font-semibold text-examia-dark">No quizzes or flashcards yet</p>
                   <p className="text-examia-mid text-sm mt-2">Your teachers will publish content here. Check <Link to="/content" className="font-medium text-examia-mid hover:text-examia-dark">Modules</Link> for subjects and fundamentals.</p>
                 </motion.div>
               )}

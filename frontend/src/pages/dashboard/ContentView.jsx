@@ -490,21 +490,23 @@ function QuizViewer({ questions, resourceId }) {
 }
 
 export function ContentView() {
-  const { id } = useParams();
+  const { id, resourceId, subjectId } = useParams();
+  const effectiveId = resourceId || id;
   const [resource, setResource] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quizAttempt, setQuizAttempt] = useState(null);
   const [attemptLoading, setAttemptLoading] = useState(false);
 
   useEffect(() => {
-    api.get(`/resources/${id}`).then((r) => setResource(r.data.resource)).catch(() => setResource(null)).finally(() => setLoading(false));
-  }, [id]);
+    if (!effectiveId) return;
+    api.get(`/resources/${effectiveId}`).then((r) => setResource(r.data.resource)).catch(() => setResource(null)).finally(() => setLoading(false));
+  }, [effectiveId]);
 
   useEffect(() => {
-    if (!id || !resource || resource.type !== 'quiz') return;
+    if (!effectiveId || !resource || resource.type !== 'quiz') return;
     setAttemptLoading(true);
-    api.get(`/resources/${id}/quiz-attempt`).then((r) => setQuizAttempt(r.data.attempt || null)).catch(() => setQuizAttempt(null)).finally(() => setAttemptLoading(false));
-  }, [id, resource?.type]);
+    api.get(`/resources/${effectiveId}/quiz-attempt`).then((r) => setQuizAttempt(r.data.attempt || null)).catch(() => setQuizAttempt(null)).finally(() => setAttemptLoading(false));
+  }, [effectiveId, resource?.type]);
 
   const flashCards = useMemo(() => resource?.type === 'flash_cards' ? parseFlashCards(resource?.content) : null, [resource]);
   const quizQuestions = useMemo(() => resource?.type === 'quiz' ? parseQuiz(resource?.content) : null, [resource]);
@@ -520,7 +522,11 @@ export function ContentView() {
     return (
       <div className="text-center py-12">
         <p className="text-examia-mid">Content not found.</p>
-        <Link to="/content" className="text-examia-mid font-medium mt-2 inline-block">Back to Modules</Link>
+        {subjectId ? (
+          <Link to={`/content/subject/${subjectId}`} className="text-examia-mid font-medium mt-2 inline-block">← Back to subject</Link>
+        ) : (
+          <Link to="/content" className="text-examia-mid font-medium mt-2 inline-block">Back to Modules</Link>
+        )}
       </div>
     );
   }
@@ -531,7 +537,13 @@ export function ContentView() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Link to="/content" className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to Modules</Link>
+      {subjectId && resource?.type === 'quiz' ? (
+        <Link to={`/content/subject/${subjectId}/quizzes`} className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to Quizzes</Link>
+      ) : subjectId && resource?.type === 'flash_cards' ? (
+        <Link to={`/content/subject/${subjectId}/flash-cards`} className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to Flashcards</Link>
+      ) : (
+        <Link to="/content" className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to Modules</Link>
+      )}
       <h1 className="text-2xl font-bold text-examia-dark mb-2">{resource.title}</h1>
       {resource.description && <p className="text-examia-mid mb-6">{resource.description}</p>}
 
@@ -543,7 +555,7 @@ export function ContentView() {
         ) : quizAttempt ? (
           <QuizResultsView score={quizAttempt.score} maxScore={quizAttempt.maxScore} results={quizAttempt.results || []} alreadyAttempted />
         ) : (
-          <QuizViewer questions={quizQuestions} resourceId={id} />
+          <QuizViewer questions={quizQuestions} resourceId={effectiveId} />
         )
       ) : (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-examia-soft/30">

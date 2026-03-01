@@ -458,8 +458,8 @@ export function AITools() {
   if (user?.role === 'student') {
     return (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <h1 className="text-2xl font-bold text-examia-dark mb-2">Generate Quiz & Flash cards</h1>
-        <p className="text-examia-mid mb-6">Only teachers can generate quizzes and flash cards. You can view and use content that your teacher has assigned to your class.</p>
+        <h1 className="text-2xl font-bold text-examia-dark mb-2">Generate Quiz & Flashcards</h1>
+        <p className="text-examia-mid mb-6">Only teachers can generate quizzes and flashcards. You can view and use content that your teacher has assigned to your class.</p>
         <Link to="/content" className="inline-flex px-4 py-2 rounded-xl bg-examia-dark text-white font-medium hover:bg-examia-mid">
           Go to My content
         </Link>
@@ -607,7 +607,7 @@ export function AITools() {
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-8 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-semibold text-examia-dark">
-                {activeTab === 'flash_cards' ? 'Flash cards' : activeTab === 'quizzes' ? 'Quiz' : 'Result'} — edit if needed, then save and publish
+                {activeTab === 'flash_cards' ? 'Flashcards' : activeTab === 'quizzes' ? 'Quiz' : 'Result'} — edit if needed, then save and publish
               </h3>
               <button
                 type="button"

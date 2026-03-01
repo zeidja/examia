@@ -130,7 +130,7 @@ const studentSubjectTabsTop = [
   { toPath: 'materials', label: 'Fundamentals', icon: 'book' },
   { toPath: 'notes', label: 'Notes', icon: 'notes' },
   { toPath: 'quizzes', label: 'Quizzes', icon: 'clipboard' },
-  { toPath: 'flash-cards', label: 'Flash cards', icon: 'cards' },
+  { toPath: 'flash-cards', label: 'Flashcards', icon: 'cards' },
   { toPath: 'insights', label: 'Insights', icon: 'insights' },
 ];
 
@@ -167,7 +167,7 @@ function getNav(role, location) {
   return { type: 'flat', items: studentNavMain };
 }
 
-/** Student sidebar: Back to Modules, top tabs (Fundamentals, Quizzes, Flash cards), Internal Assessment dropdown. */
+/** Student sidebar: Back to Modules, top tabs (Fundamentals, Quizzes, Flashcards), Internal Assessment dropdown. */
 function StudentSubjectNav({ subjectBase, subjectTabsTop, subjectTabsInternalAssessment, onNavigate, location, NavIcons, NavLink, Link }) {
   const pathname = location?.pathname || '';
   const isInternalAssessmentActive = subjectTabsInternalAssessment?.some((t) => pathname === t.to || pathname.startsWith(t.to + '/'));
