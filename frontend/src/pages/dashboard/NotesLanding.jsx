@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { getSubjectCardStyle } from '../../utils/subjectColors';
 
 /** Subject icon keys — same as Materials page. Local: /subject-icons/{key}.png; fallback: Flaticon CDN. */
 const SUBJECT_ICON_KEYS = {
@@ -34,18 +35,6 @@ function getSubjectIconUrl(subject) {
   const sub = idStr.length > 4 ? idStr.slice(0, -3) : idStr;
   return { local: `/subject-icons/${entry.key}.png`, cdn: `${FLATICON_CDN}/${sub}/${entry.flaticonId}.png` };
 }
-
-/** Card colors + shadows — same as Materials page. */
-const SUBJECT_CARD_STYLES = [
-  { className: 'bg-amber-50 border-amber-200/60 shadow-[0_4px_14px_rgba(245,158,11,0.2)] hover:shadow-[0_8px_24px_rgba(245,158,11,0.28)]', badge: 'bg-amber-100 text-amber-800 group-hover:bg-amber-200/80' },
-  { className: 'bg-emerald-50 border-emerald-200/60 shadow-[0_4px_14px_rgba(16,185,129,0.2)] hover:shadow-[0_8px_24px_rgba(16,185,129,0.28)]', badge: 'bg-emerald-100 text-emerald-800 group-hover:bg-emerald-200/80' },
-  { className: 'bg-blue-50 border-blue-200/60 shadow-[0_4px_14px_rgba(59,130,246,0.2)] hover:shadow-[0_8px_24px_rgba(59,130,246,0.28)]', badge: 'bg-blue-100 text-blue-800 group-hover:bg-blue-200/80' },
-  { className: 'bg-violet-50 border-violet-200/60 shadow-[0_4px_14px_rgba(139,92,246,0.2)] hover:shadow-[0_8px_24px_rgba(139,92,246,0.28)]', badge: 'bg-violet-100 text-violet-800 group-hover:bg-violet-200/80' },
-  { className: 'bg-rose-50 border-rose-200/60 shadow-[0_4px_14px_rgba(244,63,94,0.2)] hover:shadow-[0_8px_24px_rgba(244,63,94,0.28)]', badge: 'bg-rose-100 text-rose-800 group-hover:bg-rose-200/80' },
-  { className: 'bg-cyan-50 border-cyan-200/60 shadow-[0_4px_14px_rgba(6,182,212,0.2)] hover:shadow-[0_8px_24px_rgba(6,182,212,0.28)]', badge: 'bg-cyan-100 text-cyan-800 group-hover:bg-cyan-200/80' },
-  { className: 'bg-orange-50 border-orange-200/60 shadow-[0_4px_14px_rgba(249,115,22,0.2)] hover:shadow-[0_8px_24px_rgba(249,115,22,0.28)]', badge: 'bg-orange-100 text-orange-800 group-hover:bg-orange-200/80' },
-  { className: 'bg-teal-50 border-teal-200/60 shadow-[0_4px_14px_rgba(20,184,166,0.2)] hover:shadow-[0_8px_24px_rgba(20,184,166,0.28)]', badge: 'bg-teal-100 text-teal-800 group-hover:bg-teal-200/80' },
-];
 
 /** Landing page for Note taking: list subjects with same design as Materials. */
 export function NotesLanding() {
@@ -113,8 +102,8 @@ export function NotesLanding() {
         </div>
       ) : (
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {subjects.map((s, i) => {
-            const cardStyle = SUBJECT_CARD_STYLES[i % SUBJECT_CARD_STYLES.length];
+          {subjects.map((s) => {
+            const cardStyle = getSubjectCardStyle(s);
             const iconUrls = getSubjectIconUrl(s);
             const showIcon = iconUrls && !iconErrors.has(s._id);
             return (
@@ -122,7 +111,7 @@ export function NotesLanding() {
                 key={s._id}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03 }}
+                transition={{ duration: 0.2 }}
               >
                 <Link
                   to={`/content/subject/${s._id}/notes`}
@@ -134,7 +123,7 @@ export function NotesLanding() {
                         <img
                           src={iconUrls.local}
                           alt=""
-                          className="w-8 h-8 object-contain"
+                          className="w-8 h-8 object-contain brightness-0 invert"
                           onError={(e) => {
                             const img = e.target;
                             if (img.dataset.triedCdn) {

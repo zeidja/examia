@@ -7,6 +7,7 @@ import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { fileNameWithoutExtension } from '../../utils/format';
 import { MarkdownBlock } from '../../components/MarkdownBlock';
+import { getSubjectCardStyle } from '../../utils/subjectColors';
 
 /** Splits content by LaTeX blocks (\[ \], $$ $$, \( \), $ $) and returns array of { type: 'text'|'html', value } for rendering. */
 function parseContentWithMath(content) {
@@ -54,26 +55,6 @@ function MessageContent({ content, className = '' }) {
 }
 
 const typeLabels = { material: 'Material', quiz: 'Quiz', flash_cards: 'Flashcards' };
-
-/** Subject card colors — same order as Materials/Notes so subject color is consistent. */
-const SUBJECT_CARD_STYLES = [
-  { card: 'bg-amber-50 border-amber-200/60 shadow-[0_4px_14px_rgba(245,158,11,0.2)] hover:shadow-[0_8px_24px_rgba(245,158,11,0.28)]', badge: 'bg-amber-100 text-amber-800' },
-  { card: 'bg-emerald-50 border-emerald-200/60 shadow-[0_4px_14px_rgba(16,185,129,0.2)] hover:shadow-[0_8px_24px_rgba(16,185,129,0.28)]', badge: 'bg-emerald-100 text-emerald-800' },
-  { card: 'bg-blue-50 border-blue-200/60 shadow-[0_4px_14px_rgba(59,130,246,0.2)] hover:shadow-[0_8px_24px_rgba(59,130,246,0.28)]', badge: 'bg-blue-100 text-blue-800' },
-  { card: 'bg-violet-50 border-violet-200/60 shadow-[0_4px_14px_rgba(139,92,246,0.2)] hover:shadow-[0_8px_24px_rgba(139,92,246,0.28)]', badge: 'bg-violet-100 text-violet-800' },
-  { card: 'bg-rose-50 border-rose-200/60 shadow-[0_4px_14px_rgba(244,63,94,0.2)] hover:shadow-[0_8px_24px_rgba(244,63,94,0.28)]', badge: 'bg-rose-100 text-rose-800' },
-  { card: 'bg-cyan-50 border-cyan-200/60 shadow-[0_4px_14px_rgba(6,182,212,0.2)] hover:shadow-[0_8px_24px_rgba(6,182,212,0.28)]', badge: 'bg-cyan-100 text-cyan-800' },
-  { card: 'bg-orange-50 border-orange-200/60 shadow-[0_4px_14px_rgba(249,115,22,0.2)] hover:shadow-[0_8px_24px_rgba(249,115,22,0.28)]', badge: 'bg-orange-100 text-orange-800' },
-  { card: 'bg-teal-50 border-teal-200/60 shadow-[0_4px_14px_rgba(20,184,166,0.2)] hover:shadow-[0_8px_24px_rgba(20,184,166,0.28)]', badge: 'bg-teal-100 text-teal-800' },
-];
-
-function getSubjectStyleIndex(subjectName) {
-  if (!subjectName || typeof subjectName !== 'string') return 0;
-  const n = subjectName.toLowerCase().trim();
-  const order = ['biology', 'chemistry', 'math', 'economics', 'business', 'physics', 'psychology', 'global politics', 'politics'];
-  const i = order.findIndex((key) => n.includes(key));
-  return i >= 0 ? i % SUBJECT_CARD_STYLES.length : 0;
-}
 
 /** Summary from student ratings: { easy, medium, hard } */
 function FlashCardSummaryPills({ summary }) {
@@ -239,8 +220,7 @@ export function SubjectQuizzes() {
   const { subjectId, resources, subject } = useOutletContext() || {};
   const quizzes = (resources || []).filter((r) => r.type === 'quiz').map((r) => ({ ...r, _subjectId: subjectId }));
   const openFile = () => {};
-  const styleIndex = getSubjectStyleIndex(subject?.name);
-  const cardStyle = SUBJECT_CARD_STYLES[styleIndex];
+  const cardStyle = getSubjectCardStyle(subject);
 
   return (
     <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
@@ -259,8 +239,7 @@ export function SubjectFlashCards() {
   const flashcards = (resources || []).filter((r) => r.type === 'flash_cards').map((r) => ({ ...r, _subjectId: subjectId }));
   const [flashCardSummaries, setFlashCardSummaries] = useState({});
   const openFile = () => {};
-  const styleIndex = getSubjectStyleIndex(subject?.name);
-  const cardStyle = SUBJECT_CARD_STYLES[styleIndex];
+  const cardStyle = getSubjectCardStyle(subject);
 
   const flashCardIds = useMemo(() => flashcards.map((f) => f._id), [flashcards]);
   useEffect(() => {

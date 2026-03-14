@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { showError } from '../../utils/swal';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
@@ -35,17 +36,7 @@ function getSubjectIconUrl(subject) {
   return { local: `/subject-icons/${entry.key}.png`, cdn: `${FLATICON_CDN}/${sub}/${entry.flaticonId}.png` };
 }
 
-/** Same colors and style as student Modules tab. */
-const SUBJECT_CARD_STYLES = [
-  { className: 'bg-amber-50 border-amber-200/60 shadow-[0_4px_14px_rgba(245,158,11,0.2)] hover:shadow-[0_8px_24px_rgba(245,158,11,0.28)]', badge: 'bg-amber-100 text-amber-800 group-hover:bg-amber-200/80' },
-  { className: 'bg-emerald-50 border-emerald-200/60 shadow-[0_4px_14px_rgba(16,185,129,0.2)] hover:shadow-[0_8px_24px_rgba(16,185,129,0.28)]', badge: 'bg-emerald-100 text-emerald-800 group-hover:bg-emerald-200/80' },
-  { className: 'bg-blue-50 border-blue-200/60 shadow-[0_4px_14px_rgba(59,130,246,0.2)] hover:shadow-[0_8px_24px_rgba(59,130,246,0.28)]', badge: 'bg-blue-100 text-blue-800 group-hover:bg-blue-200/80' },
-  { className: 'bg-violet-50 border-violet-200/60 shadow-[0_4px_14px_rgba(139,92,246,0.2)] hover:shadow-[0_8px_24px_rgba(139,92,246,0.28)]', badge: 'bg-violet-100 text-violet-800 group-hover:bg-violet-200/80' },
-  { className: 'bg-rose-50 border-rose-200/60 shadow-[0_4px_14px_rgba(244,63,94,0.2)] hover:shadow-[0_8px_24px_rgba(244,63,94,0.28)]', badge: 'bg-rose-100 text-rose-800 group-hover:bg-rose-200/80' },
-  { className: 'bg-cyan-50 border-cyan-200/60 shadow-[0_4px_14px_rgba(6,182,212,0.2)] hover:shadow-[0_8px_24px_rgba(6,182,212,0.28)]', badge: 'bg-cyan-100 text-cyan-800 group-hover:bg-cyan-200/80' },
-  { className: 'bg-orange-50 border-orange-200/60 shadow-[0_4px_14px_rgba(249,115,22,0.2)] hover:shadow-[0_8px_24px_rgba(249,115,22,0.28)]', badge: 'bg-orange-100 text-orange-800 group-hover:bg-orange-200/80' },
-  { className: 'bg-teal-50 border-teal-200/60 shadow-[0_4px_14px_rgba(20,184,166,0.2)] hover:shadow-[0_8px_24px_rgba(20,184,166,0.28)]', badge: 'bg-teal-100 text-teal-800 group-hover:bg-teal-200/80' },
-];
+import { getSubjectCardStyle } from '../../utils/subjectColors';
 
 export function Subjects() {
   const { user } = useAuth();
@@ -124,8 +115,8 @@ export function Subjects() {
         The list below is synced from the <strong>materials</strong> folder. Use &quot;Sync from materials&quot; to refresh after adding new folders.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {subjects.map((s, i) => {
-          const cardStyle = SUBJECT_CARD_STYLES[i % SUBJECT_CARD_STYLES.length];
+        {subjects.map((s) => {
+          const cardStyle = getSubjectCardStyle(s);
           const iconUrls = getSubjectIconUrl(s);
           const showIcon = iconUrls && !iconErrors.has(s._id);
           return (
@@ -133,7 +124,7 @@ export function Subjects() {
               key={s._id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.03 }}
+              transition={{ duration: 0.2 }}
               className={`rounded-2xl p-8 border transition-all duration-200 group ${cardStyle.className}`}
             >
               <div className="flex items-center gap-4">
@@ -142,7 +133,7 @@ export function Subjects() {
                     <img
                       src={iconUrls.local}
                       alt=""
-                      className="w-8 h-8 object-contain"
+                      className="w-8 h-8 object-contain brightness-0 invert"
                       onError={(e) => {
                         const img = e.target;
                         if (img.dataset.triedCdn) {
@@ -160,6 +151,15 @@ export function Subjects() {
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-examia-dark truncate text-lg">{s.name}</p>
                   <p className="text-xs text-examia-mid truncate mt-0.5">Folder: {s.materialsPath || s.name}</p>
+                  {(user?.role === 'teacher' || user?.role === 'school_admin' || user?.role === 'super_admin') && (
+                    <Link
+                      to={`/content/subject/${s._id}/insights`}
+                      className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-examia-mid hover:text-examia-dark transition-colors"
+                    >
+                      View insights
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                    </Link>
+                  )}
                 </div>
               </div>
             </motion.div>

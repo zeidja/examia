@@ -30,6 +30,7 @@ import {
   ComingSoonPage,
 } from './pages/dashboard/SubjectContentTabs';
 import { SubjectInsights } from './pages/dashboard/SubjectInsights';
+import { SubjectInsightsStudentDetail } from './pages/dashboard/SubjectInsightsStudentDetail';
 import { SubjectNotesList } from './pages/dashboard/SubjectNotesList';
 import { LessonStudyPage } from './pages/dashboard/LessonStudyPage';
 import { NotesLanding } from './pages/dashboard/NotesLanding';
@@ -88,6 +89,7 @@ function AppRoutes() {
           <Route path="checklists" element={<SubjectChecklists />} />
           <Route path="quizzes" element={<SubjectQuizzes />} />
           <Route path="insights" element={<SubjectInsights />} />
+          <Route path="insights/student/:studentId" element={<SubjectInsightsStudentDetail />} />
           <Route path="flash-cards" element={<SubjectFlashCards />} />
           <Route path="ideas" element={<SubjectIdeas />} />
           <Route path="study-and-learn" element={<SubjectStudyLearn />} />

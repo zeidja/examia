@@ -86,7 +86,7 @@ const flatNavIcons = {
   'AI Prompts': 'lightbulb',
   'Users': 'folder',
   'Classes': 'clipboard',
-  'Flash Cards': 'cards',
+  'Flashcards': 'cards',
   'Quizzes': 'clipboard',
   'Resources': 'folder',
   'My resources': 'folder',
@@ -107,7 +107,7 @@ const schoolAdminNav = [
   { to: '/subjects', label: 'Subjects' },
   { to: '/classes', label: 'Classes' },
   { to: '/users', label: 'Users' },
-  { to: '/ai/flash-cards', label: 'Flash Cards' },
+  { to: '/ai/flash-cards', label: 'Flashcards' },
   { to: '/ai/quizzes', label: 'Quizzes' },
   { to: '/resources', label: 'Resources' },
 ];
@@ -116,7 +116,7 @@ const teacherNav = [
   { to: '/dashboard', label: 'Home' },
   { to: '/subjects', label: 'Subjects' },
   { to: '/classes', label: 'Classes' },
-  { to: '/ai/flash-cards', label: 'Flash Cards' },
+  { to: '/ai/flash-cards', label: 'Flashcards' },
   { to: '/ai/quizzes', label: 'Quizzes' },
   { to: '/resources', label: 'My resources' },
 ];
@@ -374,8 +374,7 @@ export function DashboardLayout() {
                   subjectTabsAfterIA={nav.subjectTabsAfterIA}
                   subjectTabsInternalAssessment={nav.subjectTabsInternalAssessment}
                   onNavigate={(toPath) => {
-                    const toSubjectId = toPath?.match?.(/^\/content\/subject\/([^/]+)/)?.[1];
-                    if (toSubjectId && toSubjectId === subjectIdFromPath) return;
+                    if (subjectIdFromPath && toPath && (toPath === `/content/subject/${subjectIdFromPath}` || toPath.startsWith(`/content/subject/${subjectIdFromPath}/`))) return;
                     setSidebarOpen(false);
                   }}
                   onBack={() => {
@@ -488,8 +487,7 @@ export function DashboardLayout() {
 
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden pointer-events-none"
           aria-hidden
         />
       )}
