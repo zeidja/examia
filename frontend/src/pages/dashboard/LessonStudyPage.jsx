@@ -44,8 +44,8 @@ function KeyTermCard({ term, definition, onRemove, canEdit }) {
   );
 }
 
-/** Self-test item: question with "Show Answer" toggle. */
-function SelfTestItem({ question, answer, onRemove, canEdit }) {
+/** Self-test item: question with "Show Answer" toggle. When hideAnswer (recall mode), only the question is shown. */
+function SelfTestItem({ question, answer, onRemove, canEdit, hideAnswer }) {
   const [revealed, setRevealed] = useState(false);
   return (
     <motion.div
@@ -56,6 +56,7 @@ function SelfTestItem({ question, answer, onRemove, canEdit }) {
       className="rounded-xl border border-examia-soft/40 bg-white p-4"
     >
       <p className="font-medium text-examia-dark">Q: {question || '—'}</p>
+      {!hideAnswer && (
       <div className="mt-2">
         <button
           type="button"
@@ -66,6 +67,7 @@ function SelfTestItem({ question, answer, onRemove, canEdit }) {
         </button>
         {revealed && <p className="mt-2 text-sm text-examia-dark pl-0">{answer || '—'}</p>}
       </div>
+      )}
       {canEdit && onRemove && (
         <button
           type="button"
@@ -558,6 +560,7 @@ export function LessonStudyPage() {
               question={st.question}
               answer={st.answer}
               canEdit={canEdit}
+              hideAnswer={recallMode}
               onRemove={
                 canEdit
                   ? () => {
