@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
+import { MarkdownBlock } from '../../components/MarkdownBlock';
 
 export function QuizReport() {
   const { resourceId } = useParams();
@@ -78,7 +79,7 @@ export function QuizReport() {
           )}
           {tipsError && <p className="text-amber-700 text-sm">{tipsError}</p>}
           {!tipsLoading && tips && (
-            <div className="text-examia-dark text-sm leading-relaxed whitespace-pre-wrap">{tips}</div>
+            <MarkdownBlock content={tips} className="text-examia-dark text-sm leading-relaxed" />
           )}
         </motion.div>
       )}

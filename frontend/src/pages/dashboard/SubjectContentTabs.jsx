@@ -1,39 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { fileNameWithoutExtension } from '../../utils/format';
-
-/** Renders markdown (headings, bold, lists) for Ideas and other AI text. */
-function MarkdownContent({ content, className = '' }) {
-  if (!content || typeof content !== 'string') return null;
-  return (
-    <div className={className}>
-      <ReactMarkdown
-      components={{
-        h1: ({ node, ...p }) => <h1 className="text-xl font-bold text-examia-dark mt-4 mb-2 first:mt-0" {...p} />,
-        h2: ({ node, ...p }) => <h2 className="text-lg font-bold text-examia-dark mt-4 mb-2 first:mt-0" {...p} />,
-        h3: ({ node, ...p }) => <h3 className="text-base font-semibold text-examia-dark mt-3 mb-1.5 first:mt-0" {...p} />,
-        h4: ({ node, ...p }) => <h4 className="text-sm font-semibold text-examia-dark mt-2 mb-1 first:mt-0" {...p} />,
-        h5: ({ node, ...p }) => <h5 className="text-sm font-medium text-examia-dark mt-2 mb-1" {...p} />,
-        h6: ({ node, ...p }) => <h6 className="text-sm font-medium text-examia-dark mt-2 mb-1" {...p} />,
-        p: ({ node, ...p }) => <p className="text-examia-dark text-sm my-1.5 leading-relaxed" {...p} />,
-        strong: ({ node, ...p }) => <strong className="font-semibold text-examia-dark" {...p} />,
-        ul: ({ node, ...p }) => <ul className="list-disc list-inside my-2 space-y-0.5 text-examia-dark text-sm" {...p} />,
-        ol: ({ node, ...p }) => <ol className="list-decimal list-inside my-2 space-y-0.5 text-examia-dark text-sm" {...p} />,
-        li: ({ node, ...p }) => <li className="leading-relaxed" {...p} />,
-        hr: ({ node, ...p }) => <hr className="border-examia-soft/50 my-3" {...p} />,
-      }}
-    >
-      {content}
-    </ReactMarkdown>
-    </div>
-  );
-}
+import { MarkdownBlock } from '../../components/MarkdownBlock';
 
 /** Splits content by LaTeX blocks (\[ \], $$ $$, \( \), $ $) and returns array of { type: 'text'|'html', value } for rendering. */
 function parseContentWithMath(content) {
@@ -420,7 +393,7 @@ export function SubjectIdeas() {
                     <MessageContent content={m.content} />
                   ) : (
                     <div className="text-sm font-sans prose prose-sm max-w-none">
-                      <MarkdownContent content={m.content} className="text-examia-dark" />
+                      <MarkdownBlock content={m.content} className="text-examia-dark" />
                     </div>
                   )}
                 </div>
@@ -687,7 +660,11 @@ export function SubjectStudyLearn() {
                     : 'bg-examia-soft/20 text-examia-dark border border-examia-soft/40'
                 }`}
               >
-                <MessageContent content={m.content} className="text-sm font-sans m-0 block" />
+                {m.role === 'user' ? (
+                  <MessageContent content={m.content} className="text-sm font-sans m-0 block" />
+                ) : (
+                  <MarkdownBlock content={m.content} className="text-sm font-sans m-0 block" />
+                )}
               </div>
             </motion.div>
           ))}
@@ -799,7 +776,7 @@ export function SubjectFeynman() {
                 }`}
               >
                 {m.role === 'assistant' ? (
-                  <MarkdownContent content={m.content} className="text-sm font-sans m-0 block" />
+                  <MarkdownBlock content={m.content} className="text-sm font-sans m-0 block" />
                 ) : (
                   <MessageContent content={m.content} className="text-sm font-sans m-0 block" />
                 )}
@@ -888,7 +865,7 @@ export function SubjectFeedback() {
       {reviewFeedback && (
         <div className="mt-4 p-4 rounded-xl bg-examia-soft/20 border border-examia-soft/50">
           <h3 className="font-medium text-examia-dark mb-2">AI feedback</h3>
-          <pre className="whitespace-pre-wrap text-sm text-examia-dark font-sans">{reviewFeedback}</pre>
+          <MarkdownBlock content={reviewFeedback} className="text-sm font-sans" />
         </div>
       )}
     </motion.section>

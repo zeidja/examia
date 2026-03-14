@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { MarkdownBlock } from '../../components/MarkdownBlock';
 
 /** Parse stored content as flash cards (JSON array with front/back or question/answer) */
 function parseFlashCards(content) {
@@ -358,7 +359,7 @@ function QuizResultsView({ score, maxScore, results, alreadyAttempted }) {
                       {r.rationale && (
                         <>
                           <br />
-                          <span className="text-examia-mid italic">Tip: {r.rationale}</span>
+                          <MarkdownBlock content={`**Tip:** ${r.rationale}`} className="text-examia-mid text-sm mt-1" />
                         </>
                       )}
                     </>

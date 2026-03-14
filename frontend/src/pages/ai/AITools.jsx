@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { fileNameWithoutExtension } from '../../utils/format';
+import { MarkdownBlock } from '../../components/MarkdownBlock';
 
 const tabs = [
   { id: 'flash_cards', label: 'Flash Cards', path: 'flash-cards' },
@@ -643,7 +644,7 @@ export function AITools() {
               />
             ) : (
               <div className="rounded-xl bg-examia-bg border border-examia-soft/50 p-4 max-h-[420px] overflow-y-auto">
-                <pre className="whitespace-pre-wrap text-sm text-examia-dark font-sans">{result}</pre>
+                <MarkdownBlock content={result} className="text-sm text-examia-dark font-sans" />
                 <p className="text-xs text-examia-mid mt-2">
                   {activeTab === 'quizzes'
                     ? 'Could not parse as quiz. Use &quot;Edit as JSON&quot; to fix the format, or regenerate.'
