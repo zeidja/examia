@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate, useOutletContext } from 'react-router-dom
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { showConfirm, showSuccess, showError } from '../../utils/swal';
 
 /** List of lesson notes for a subject + "Create new lesson" (student only). */
 export function SubjectNotesList() {
@@ -39,6 +40,26 @@ export function SubjectNotesList() {
       })
       .catch((err) => setError(err.response?.data?.message || err.message))
       .finally(() => setCreating(false));
+  };
+
+  const handleDelete = async (e, note) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isStudent || !note?._id) return;
+    const confirmed = await showConfirm(
+      'Delete this lesson note? This cannot be undone.',
+      'Delete note',
+      'Delete',
+      'Cancel'
+    );
+    if (!confirmed) return;
+    try {
+      await api.delete(`/lesson-notes/${note._id}`);
+      setNotes((prev) => prev.filter((n) => n._id !== note._id));
+      showSuccess('Lesson note deleted.');
+    } catch (err) {
+      showError(err.response?.data?.message || err.message || 'Failed to delete note');
+    }
   };
 
   if (loading) {
@@ -125,31 +146,47 @@ export function SubjectNotesList() {
       {notes.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {notes.map((note) => (
-            <Link
+            <div
               key={note._id}
-              to={`/content/subject/${subjectId}/lesson/${note._id}/study`}
-              className="block rounded-2xl border border-examia-soft/30 bg-white p-5 shadow-sm hover:shadow-md hover:border-examia-soft/50 transition-all duration-200 text-left group"
+              className="relative rounded-2xl border border-examia-soft/30 bg-white shadow-sm hover:shadow-md hover:border-examia-soft/50 transition-all duration-200 group"
             >
-              <h3 className="font-semibold text-examia-dark truncate group-hover:text-examia-mid transition-colors">
-                {note.lessonTitle || 'Untitled'}
-              </h3>
-              <p className="text-xs text-examia-mid mt-1">
-                Updated {note.updatedAt ? new Date(note.updatedAt).toLocaleDateString() : '—'}
-              </p>
-              <div className="mt-3 flex items-center gap-2 text-sm text-examia-mid">
-                <span>{Array.isArray(note.summary) ? note.summary.filter(Boolean).length : 0}/5 summary</span>
-                <span>·</span>
-                <span>{Array.isArray(note.key_terms) ? note.key_terms.length : 0} terms</span>
-                <span>·</span>
-                <span>{Array.isArray(note.self_test) ? note.self_test.length : 0} Q&amp;A</span>
-              </div>
-              <span className="inline-flex items-center gap-1 mt-3 text-xs font-medium text-examia-dark group-hover:translate-x-0.5 transition-transform">
-                Open
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </span>
-            </Link>
+              <Link
+                to={`/content/subject/${subjectId}/lesson/${note._id}/study`}
+                className="block p-5 pr-12 text-left"
+              >
+                <h3 className="font-semibold text-examia-dark truncate group-hover:text-examia-mid transition-colors">
+                  {note.lessonTitle || 'Untitled'}
+                </h3>
+                <p className="text-xs text-examia-mid mt-1">
+                  Updated {note.updatedAt ? new Date(note.updatedAt).toLocaleDateString() : '—'}
+                </p>
+                <div className="mt-3 flex items-center gap-2 text-sm text-examia-mid">
+                  <span>{Array.isArray(note.summary) ? note.summary.filter(Boolean).length : 0}/5 summary</span>
+                  <span>·</span>
+                  <span>{Array.isArray(note.key_terms) ? note.key_terms.length : 0} terms</span>
+                  <span>·</span>
+                  <span>{Array.isArray(note.self_test) ? note.self_test.length : 0} Q&amp;A</span>
+                </div>
+                <span className="inline-flex items-center gap-1 mt-3 text-xs font-medium text-examia-dark group-hover:translate-x-0.5 transition-transform">
+                  Open
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </span>
+              </Link>
+              {isStudent && (
+                <button
+                  type="button"
+                  onClick={(e) => handleDelete(e, note)}
+                  className="absolute top-3 right-3 p-2 rounded-lg text-examia-mid hover:bg-red-50 hover:text-red-600 transition-colors"
+                  aria-label="Delete note"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

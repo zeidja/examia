@@ -6,6 +6,7 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { fileNameWithoutExtension } from '../../utils/format';
 
 /** Renders markdown (headings, bold, lists) for Ideas and other AI text. */
 function MarkdownContent({ content, className = '' }) {
@@ -183,13 +184,14 @@ function ResourceCard({ r, openFile, flashCardSummary, cardStyle }) {
   );
 }
 
-/** Static “coming soon” features in Fundamentals: path, title, short description, icon (svg path). */
+/** Fundamentals: path, title, description, icon; live = true means feature is available (no “Coming soon”). */
 const FUNDAMENTALS_COMING_SOON = [
   {
     path: 'definitions',
     title: 'Definitions',
     description: 'Key terms and definitions for this subject',
     icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+    live: true,
   },
   {
     path: 'command-terms',
@@ -202,6 +204,7 @@ const FUNDAMENTALS_COMING_SOON = [
     title: 'Check Lists',
     description: 'Structured checklists for your work',
     icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+    live: true,
   },
 ];
 
@@ -217,7 +220,7 @@ export function SubjectMaterials() {
       <h2 className="text-lg font-semibold text-examia-dark mb-3">Fundamentals</h2>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-        {FUNDAMENTALS_COMING_SOON.map((item, i) => (
+        {FUNDAMENTALS_COMING_SOON.map((item) => (
           <Link
             key={item.path}
             to={`${base}/${item.path}`}
@@ -232,12 +235,14 @@ export function SubjectMaterials() {
               <div className="min-w-0 flex-1">
                 <h3 className="font-semibold text-examia-dark group-hover:text-examia-mid transition-colors">{item.title}</h3>
                 <p className="text-sm text-examia-mid mt-0.5">{item.description}</p>
-                <span className="inline-flex items-center gap-1.5 mt-3 text-xs font-medium text-examia-mid">
-                  Coming soon
-                  <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </span>
+                {!item.live && (
+                  <span className="inline-flex items-center gap-1.5 mt-3 text-xs font-medium text-examia-mid">
+                    Coming soon
+                    <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                )}
               </div>
             </div>
           </Link>
@@ -637,7 +642,7 @@ export function SubjectStudyLearn() {
                             )}
                           </span>
                           <span className="flex-1 min-w-0 text-sm font-medium text-examia-dark truncate" title={f.relativePath}>
-                            {f.name}
+                            {fileNameWithoutExtension(f.name)}
                           </span>
                           {isSelected && (
                             <span className="shrink-0 w-5 h-5 rounded-full bg-examia-dark text-white flex items-center justify-center">
@@ -843,7 +848,7 @@ export function SubjectFeedback() {
     try {
       const formData = new FormData();
       formData.append('file', reviewFile);
-      formData.append('type', 'internal_assessment');
+      formData.append('type', subject?.name === 'TOK Essay' ? 'external_assessment' : 'internal_assessment');
       formData.append('subject', subject?.name || '');
       const { data } = await api.post('/ai/review-submission/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -870,7 +875,7 @@ export function SubjectFeedback() {
             onChange={(e) => setReviewFile(e.target.files?.[0] || null)}
             className="w-full px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-examia-soft/30 file:text-examia-dark file:font-medium"
           />
-          {reviewFile && <p className="text-examia-mid text-sm mt-1">Selected: {reviewFile.name}</p>}
+          {reviewFile && <p className="text-examia-mid text-sm mt-1">Selected: {fileNameWithoutExtension(reviewFile.name)}</p>}
         </div>
         <button
           type="submit"
@@ -890,7 +895,430 @@ export function SubjectFeedback() {
   );
 }
 
+/** Split definitions text into sections by letter (A, B, C, ...). Sections start with a line that is a single letter. */
+function getDefinitionsSections(fullText) {
+  if (!fullText || !fullText.trim()) return { all: '', sections: {}, letters: [] };
+  const all = fullText.trim();
+  const sections = {};
+  const letters = [];
+  const lines = fullText.split(/\r?\n/);
+  let currentLetter = null;
+  let currentLines = [];
+
+  const flush = (letter) => {
+    const content = currentLines.join('\n').trim();
+    if (content && letter) {
+      sections[letter] = content;
+      if (!letters.includes(letter)) letters.push(letter);
+    }
+    currentLines = [];
+  };
+
+  for (const line of lines) {
+    const singleLetter = /^([A-Z])\s*$/.exec(line);
+    if (singleLetter) {
+      flush(currentLetter);
+      currentLetter = singleLetter[1];
+    } else {
+      currentLines.push(line);
+    }
+  }
+  flush(currentLetter);
+  letters.sort();
+  return { all, sections, letters: letters.length ? letters : null };
+}
+
+/** Highlight search phrase in text; return array of { text, highlight }. */
+function highlightMatches(text, search) {
+  if (!search || !search.trim()) return [{ text, highlight: false }];
+  const q = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(${q})`, 'gi');
+  const parts = [];
+  let lastIndex = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIndex) parts.push({ text: text.slice(lastIndex, m.index), highlight: false });
+    parts.push({ text: m[1], highlight: true });
+    lastIndex = re.lastIndex;
+  }
+  if (lastIndex < text.length) parts.push({ text: text.slice(lastIndex), highlight: false });
+  return parts.length ? parts : [{ text, highlight: false }];
+}
+
+/** Definitions tab: list definition files and view content in-app (full-screen with search and A–Z filter). */
+export function SubjectDefinitions() {
+  const { subjectId } = useParams();
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [viewingFile, setViewingFile] = useState(null);
+  const [viewContent, setViewContent] = useState('');
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [letterFilter, setLetterFilter] = useState('all');
+  const contentRef = useRef(null);
+
+  const { all, sections, letters } = useMemo(
+    () => getDefinitionsSections(viewContent),
+    [viewContent]
+  );
+
+  const displayedText = useMemo(() => {
+    if (letterFilter === 'all' || !letters || !sections[letterFilter]) return all;
+    return sections[letterFilter] || all;
+  }, [letterFilter, all, sections, letters]);
+
+  const filteredBySearch = useMemo(() => {
+    if (!searchQuery.trim()) return displayedText;
+    const q = searchQuery.trim().toLowerCase();
+    const lines = displayedText.split('\n');
+    const matched = lines.filter((line) => line.toLowerCase().includes(q));
+    return matched.join('\n') || displayedText;
+  }, [displayedText, searchQuery]);
+
+  useEffect(() => {
+    if (!subjectId) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get('/materials/definitions', { params: { subjectId } })
+      .then((res) => {
+        if (!cancelled && res.data?.success) setFiles(res.data.files || []);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.response?.data?.message || err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [subjectId]);
+
+  const openView = (relativePath, fileName) => {
+    setViewingFile(fileName || relativePath);
+    setViewContent('');
+    setViewError(null);
+    setSearchQuery('');
+    setLetterFilter('all');
+    setViewLoading(true);
+    api
+      .get('/materials/definitions/file/content', { params: { path: relativePath || fileName } })
+      .then((res) => {
+        if (res.data?.success) setViewContent(res.data.content || '');
+        else setViewError(res.data?.message || 'Could not load content.');
+      })
+      .catch((err) => setViewError(err.response?.data?.message || err.message || 'Could not load content.'))
+      .finally(() => setViewLoading(false));
+  };
+
+  const closeView = () => {
+    setViewingFile(null);
+    setViewContent('');
+    setViewError(null);
+    setSearchQuery('');
+    setLetterFilter('all');
+  };
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      <h2 className="text-lg font-semibold text-examia-dark mb-3">Definitions</h2>
+      {loading && <p className="text-examia-mid text-sm">Loading…</p>}
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {!loading && !error && files.length === 0 && (
+        <div className="rounded-2xl border-2 border-examia-soft/30 bg-examia-soft/5 p-6 text-center">
+          <p className="text-examia-dark font-medium">This subject does not have definitions yet.</p>
+          <p className="text-examia-mid text-sm mt-1">Check back later or use other resources for this subject.</p>
+        </div>
+      )}
+      {!loading && !error && files.length > 0 && (
+        <div className="space-y-2">
+          {files.map((f) => (
+            <button
+              key={f.relativePath || f.name}
+              type="button"
+              onClick={() => openView(f.relativePath || f.name, f.name)}
+              className="w-full sm:max-w-md flex items-center gap-3 rounded-xl border-2 border-examia-soft/30 bg-white hover:bg-examia-soft/10 hover:border-examia-soft/50 p-4 text-left transition-colors"
+            >
+              <span className="flex shrink-0 w-10 h-10 rounded-lg bg-examia-dark/10 text-examia-dark flex items-center justify-center">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </span>
+              <span className="font-medium text-examia-dark truncate">{fileNameWithoutExtension(f.name || f.relativePath)}</span>
+              <span className="ml-auto shrink-0 text-examia-mid">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Full-screen viewer with search and letter filter */}
+      {viewingFile && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-white"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="definitions-viewer-title"
+        >
+          <div className="shrink-0 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-examia-soft/30 bg-examia-soft/5">
+            <button
+              type="button"
+              onClick={closeView}
+              className="p-2 rounded-lg text-examia-mid hover:bg-examia-soft/20 hover:text-examia-dark transition-colors"
+              aria-label="Close"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <h3 id="definitions-viewer-title" className="font-semibold text-examia-dark truncate max-w-[200px] sm:max-w-none">
+              {fileNameWithoutExtension(viewingFile)}
+            </h3>
+            <div className="flex-1 min-w-0 flex flex-wrap items-center gap-2 sm:gap-3">
+              <label className="sr-only" htmlFor="definitions-search">Search definitions</label>
+              <input
+                id="definitions-search"
+                type="search"
+                placeholder="Search…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 min-w-[120px] max-w-xs rounded-lg border border-examia-soft/50 bg-white px-3 py-2 text-sm text-examia-dark placeholder:text-examia-mid focus:ring-2 focus:ring-examia-mid focus:border-transparent"
+              />
+              <div className="flex items-center gap-1 flex-wrap">
+                <span className="text-xs font-medium text-examia-mid mr-1">Letter:</span>
+                <button
+                  type="button"
+                  onClick={() => setLetterFilter('all')}
+                  className={`px-2.5 py-1 rounded-md text-sm font-medium transition-colors ${letterFilter === 'all' ? 'bg-examia-dark text-white' : 'bg-examia-soft/30 text-examia-dark hover:bg-examia-soft/50'}`}
+                >
+                  All
+                </button>
+                {letters && letters.map((letter) => (
+                  <button
+                    key={letter}
+                    type="button"
+                    onClick={() => setLetterFilter(letter)}
+                    className={`px-2 py-1 rounded-md text-sm font-medium min-w-[2rem] transition-colors ${letterFilter === letter ? 'bg-examia-dark text-white' : 'bg-examia-soft/30 text-examia-dark hover:bg-examia-soft/50'}`}
+                  >
+                    {letter}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div ref={contentRef} className="flex-1 overflow-auto p-4 sm:p-6 min-h-0">
+            {viewLoading && (
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-10 w-10 border-2 border-examia-mid border-t-transparent" />
+              </div>
+            )}
+            {viewError && !viewLoading && (
+              <p className="text-red-600 text-sm py-4">{viewError}</p>
+            )}
+            {!viewLoading && !viewError && (
+              <div className="max-w-4xl mx-auto">
+                <pre className="whitespace-pre-wrap font-sans text-sm sm:text-base leading-relaxed text-examia-dark bg-transparent p-0 border-0">
+                  {filteredBySearch.split('\n').map((line, i) => {
+                    const parts = highlightMatches(line, searchQuery);
+                    return (
+                      <span key={i} className="block py-0.5">
+                        {parts.map((p, j) =>
+                          p.highlight ? (
+                            <mark key={j} className="bg-amber-200/80 text-examia-dark rounded px-0.5">
+                              {p.text}
+                            </mark>
+                          ) : (
+                            <span key={j}>{p.text}</span>
+                          )
+                        )}
+                        {'\n'}
+                      </span>
+                    );
+                  })}
+                </pre>
+                {searchQuery.trim() && filteredBySearch === displayedText && displayedText.length > 0 && (
+                  <p className="text-examia-mid text-xs mt-2">Highlighting matches for “{searchQuery}”</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </motion.section>
+  );
+}
+
 /** Static “Coming Soon” page for features like Definitions, Command Terms, Check Lists. */
+export function SubjectChecklists() {
+  const { subjectId } = useParams();
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [viewingFile, setViewingFile] = useState(null);
+  const [viewContent, setViewContent] = useState('');
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const contentRef = useRef(null);
+
+  const filteredBySearch = useMemo(() => {
+    if (!searchQuery.trim()) return viewContent;
+    const q = searchQuery.trim().toLowerCase();
+    const lines = viewContent.split('\n');
+    const matched = lines.filter((line) => line.toLowerCase().includes(q));
+    return matched.join('\n') || viewContent;
+  }, [viewContent, searchQuery]);
+
+  /** Group checklist files by first letter of display name (A, B, C, …). */
+  const filesByLetter = useMemo(() => {
+    const map = {};
+    for (const f of files) {
+      const displayName = fileNameWithoutExtension(f.name || f.relativePath).trim();
+      const first = (displayName[0] || '').toUpperCase();
+      const letter = /[A-Z]/.test(first) ? first : /[0-9]/.test(displayName[0]) ? '0-9' : '#';
+      if (!map[letter]) map[letter] = [];
+      map[letter].push(f);
+    }
+    const letters = Object.keys(map).sort((a, b) => {
+      if (a === '#') return 1;
+      if (b === '#') return -1;
+      if (a === '0-9') return 1;
+      if (b === '0-9') return -1;
+      return a.localeCompare(b);
+    });
+    return { letters, map };
+  }, [files]);
+
+  useEffect(() => {
+    if (!subjectId) { setLoading(false); return; }
+    let cancelled = false;
+    api.get('/materials/checklists', { params: { subjectId } })
+      .then((res) => { if (!cancelled && res.data?.success) setFiles(res.data.files || []); })
+      .catch((err) => { if (!cancelled) setError(err.response?.data?.message || err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [subjectId]);
+
+  const openView = (relativePath, fileName) => {
+    setViewingFile(fileName || relativePath);
+    setViewContent('');
+    setViewError(null);
+    setSearchQuery('');
+    setViewLoading(true);
+    api.get('/materials/checklists/file/content', { params: { path: relativePath } })
+      .then((res) => {
+        if (res.data?.success) setViewContent(res.data.content || '');
+        else setViewError(res.data?.message || 'Could not load content.');
+      })
+      .catch((err) => setViewError(err.response?.data?.message || err.message || 'Could not load content.'))
+      .finally(() => setViewLoading(false));
+  };
+
+  const closeView = () => { setViewingFile(null); setViewContent(''); setViewError(null); setSearchQuery(''); };
+
+  return (
+    <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+      <h2 className="text-lg font-semibold text-examia-dark mb-3">Check Lists</h2>
+      {loading && <p className="text-examia-mid text-sm">Loading…</p>}
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {!loading && !error && files.length === 0 && (
+        <div className="rounded-2xl border-2 border-examia-soft/30 bg-examia-soft/5 p-6 text-center">
+          <p className="text-examia-dark font-medium">This subject does not have checklists yet.</p>
+          <p className="text-examia-mid text-sm mt-1">Check back later or use other resources for this subject.</p>
+        </div>
+      )}
+      {!loading && !error && files.length > 0 && (
+        <div className="space-y-6">
+          {filesByLetter.letters.map((letter) => (
+            <section key={letter}>
+              <h3 className="text-base font-semibold text-examia-dark mb-2 flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-examia-dark text-white flex items-center justify-center text-sm font-bold">
+                  {letter}
+                </span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {filesByLetter.map[letter].map((f) => (
+                  <button
+                    key={f.relativePath || f.name}
+                    type="button"
+                    onClick={() => openView(f.relativePath, f.name)}
+                    className="flex items-center gap-3 rounded-xl border-2 border-examia-soft/30 bg-white hover:bg-examia-soft/10 hover:border-examia-soft/50 p-4 text-left transition-colors min-w-0"
+                  >
+                    <span className="flex shrink-0 w-10 h-10 rounded-lg bg-examia-dark/10 text-examia-dark flex items-center justify-center">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                    <span className="font-medium text-examia-dark truncate min-w-0 flex-1">{fileNameWithoutExtension(f.name || f.relativePath)}</span>
+                    <span className="shrink-0 text-examia-mid">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+      {viewingFile && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-white" role="dialog" aria-modal="true" aria-labelledby="checklists-viewer-title">
+          <div className="shrink-0 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-examia-soft/30 bg-examia-soft/5">
+            <button type="button" onClick={closeView} className="p-2 rounded-lg text-examia-mid hover:bg-examia-soft/20 hover:text-examia-dark transition-colors" aria-label="Close">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+            <h3 id="checklists-viewer-title" className="font-semibold text-examia-dark truncate max-w-[200px] sm:max-w-none">{fileNameWithoutExtension(viewingFile)}</h3>
+            <div className="flex-1 min-w-0 flex flex-wrap items-center gap-2">
+              <label className="sr-only" htmlFor="checklists-search">Search checklists</label>
+              <input
+                id="checklists-search"
+                type="search"
+                placeholder="Search…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 min-w-[120px] max-w-xs rounded-lg border border-examia-soft/50 bg-white px-3 py-2 text-sm text-examia-dark placeholder:text-examia-mid focus:ring-2 focus:ring-examia-mid focus:border-transparent"
+              />
+            </div>
+          </div>
+          <div ref={contentRef} className="flex-1 overflow-auto p-4 sm:p-6 min-h-0">
+            {viewLoading && <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-2 border-examia-mid border-t-transparent" /></div>}
+            {viewError && !viewLoading && <p className="text-red-600 text-sm py-4">{viewError}</p>}
+            {!viewLoading && !viewError && (
+              <div className="max-w-4xl mx-auto">
+                <pre className="whitespace-pre-wrap font-sans text-sm sm:text-base leading-relaxed text-examia-dark bg-transparent p-0 border-0">
+                  {filteredBySearch.split('\n').map((line, i) => {
+                    const parts = highlightMatches(line, searchQuery);
+                    return (
+                      <span key={i} className="block py-0.5">
+                        {parts.map((p, j) => p.highlight ? <mark key={j} className="bg-amber-200/80 text-examia-dark rounded px-0.5">{p.text}</mark> : <span key={j}>{p.text}</span>)}
+                        {'\n'}
+                      </span>
+                    );
+                  })}
+                </pre>
+                {searchQuery.trim() && <p className="text-examia-mid text-xs mt-2">Highlighting matches for &quot;{searchQuery}&quot;</p>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </motion.section>
+  );
+}
+
 export function ComingSoonPage({ title }) {
   return (
     <motion.section

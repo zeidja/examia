@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { showError } from '../../utils/swal';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
+import { fileNameWithoutExtension } from '../../utils/format';
 
 function TreeNode({ node, level = 0, expanded, onToggle, onOpenFile }) {
   const isFolder = node.type === 'folder';
@@ -49,7 +50,7 @@ function TreeNode({ node, level = 0, expanded, onToggle, onOpenFile }) {
           className="flex items-center gap-2 w-full text-left px-3 py-2 rounded-lg hover:bg-examia-soft/20 group text-examia-dark"
         >
           <span className="text-examia-mid">📄</span>
-          <span className="text-sm flex-1 truncate">{node.name}</span>
+          <span className="text-sm flex-1 truncate">{fileNameWithoutExtension(node.name)}</span>
           <span className="text-sm text-examia-mid font-medium opacity-0 group-hover:opacity-100 transition">Open</span>
         </button>
       )}

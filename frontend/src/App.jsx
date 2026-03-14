@@ -16,7 +16,7 @@ import { Users } from './pages/dashboard/Users';
 import { Classes } from './pages/dashboard/Classes';
 import { AITools } from './pages/ai/AITools';
 import { MyContent } from './pages/dashboard/MyContent';
-import { SubjectContentLayout } from './pages/dashboard/SubjectContentLayout';
+import { SubjectContentLayout, SubjectIndexRedirect } from './pages/dashboard/SubjectContentLayout';
 import {
   SubjectMaterials,
   SubjectQuizzes,
@@ -25,6 +25,8 @@ import {
   SubjectStudyLearn,
   SubjectFeynman,
   SubjectFeedback,
+  SubjectDefinitions,
+  SubjectChecklists,
   ComingSoonPage,
 } from './pages/dashboard/SubjectContentTabs';
 import { SubjectInsights } from './pages/dashboard/SubjectInsights';
@@ -76,14 +78,14 @@ function AppRoutes() {
         <Route path="content/flashcards" element={<FlashcardsLanding />} />
         <Route path="content/quizzes" element={<QuizzesLanding />} />
         <Route path="content/subject/:subjectId" element={<SubjectContentLayout />}>
-          <Route index element={<Navigate to="materials" replace />} />
+          <Route index element={<SubjectIndexRedirect />} />
           <Route path="materials" element={<SubjectMaterials />} />
           <Route path="notes" element={<SubjectNotesList />} />
           <Route path="lesson/:noteId/study" element={<LessonStudyPage />} />
           <Route path="resource/:resourceId" element={<ContentView />} />
-          <Route path="definitions" element={<ComingSoonPage title="Definitions" />} />
+          <Route path="definitions" element={<SubjectDefinitions />} />
           <Route path="command-terms" element={<ComingSoonPage title="Command Terms" />} />
-          <Route path="checklists" element={<ComingSoonPage title="Check Lists" />} />
+          <Route path="checklists" element={<SubjectChecklists />} />
           <Route path="quizzes" element={<SubjectQuizzes />} />
           <Route path="insights" element={<SubjectInsights />} />
           <Route path="flash-cards" element={<SubjectFlashCards />} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api/axios';
 
@@ -29,6 +29,7 @@ function BarSegment({ value, total, color, label }) {
 
 export function FlashCardReport() {
   const { resourceId } = useParams();
+  const navigate = useNavigate();
   const [stats, setStats] = useState([]);
   const [students, setStudents] = useState([]);
   const [resourceTitle, setResourceTitle] = useState('');
@@ -62,7 +63,7 @@ export function FlashCardReport() {
     return (
       <div className="text-center py-12">
         <p className="text-red-600 mb-2">{error}</p>
-        <Link to="/resources" className="text-examia-mid font-medium hover:text-examia-dark">← Back to My resources</Link>
+        <button type="button" onClick={() => navigate(-1)} className="text-examia-mid font-medium hover:text-examia-dark">← Back</button>
       </div>
     );
   }
@@ -74,7 +75,7 @@ export function FlashCardReport() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-      <Link to="/resources" className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to My resources</Link>
+      <button type="button" onClick={() => navigate(-1)} className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back</button>
       <h1 className="text-2xl font-bold text-examia-dark mb-2">Flashcard report: {resourceTitle}</h1>
       <p className="text-examia-mid mb-8">
         How students rated each card (Easy / Medium / Hard). View totals, per-card breakdown, and per-student progress.

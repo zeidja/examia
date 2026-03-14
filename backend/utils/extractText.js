@@ -31,7 +31,8 @@ export async function extractTextFromBuffer(buffer, mimetype, originalname = '')
     mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     mime === 'application/msword' ||
     ext === 'docx' ||
-    ext === 'doc'
+    ext === 'doc' ||
+    ext === 'dotx'
   ) {
     const result = await mammoth.extractRawText({ buffer });
     return result?.value ?? '';

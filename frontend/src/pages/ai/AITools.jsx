@@ -4,6 +4,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { fileNameWithoutExtension } from '../../utils/format';
 
 const tabs = [
   { id: 'flash_cards', label: 'Flash Cards', path: 'flash-cards' },
@@ -274,11 +275,11 @@ function QuizEditor({ data, onChange }) {
   );
 }
 
-/** Flatten materials tree to list of files { title, relativePath } */
+/** Flatten materials tree to list of files { title, relativePath } — title shown without extension */
 function flattenMaterialFiles(node) {
   if (!node) return [];
   if (node.type === 'file' && node.relativePath) {
-    return [{ title: node.name, relativePath: node.relativePath }];
+    return [{ title: fileNameWithoutExtension(node.name), relativePath: node.relativePath }];
   }
   if (node.children && node.children.length) {
     return node.children.flatMap((c) => flattenMaterialFiles(c));

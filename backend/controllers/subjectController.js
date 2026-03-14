@@ -32,12 +32,25 @@ export const syncFromMaterials = async (req, res) => {
       synced.push(subject);
     }
 
-    // Deactivate subjects whose materials folder no longer exists (e.g. removed "Math" after adding "Math AA" and "Math Applied")
+    // Deactivate subjects whose materials folder no longer exists (do not deactivate iaOnly subjects like TOK Essay/Exhibition)
     const deactivated = await Subject.updateMany(
-      { materialsPath: { $nin: folderNames }, isActive: true },
+      { materialsPath: { $nin: folderNames }, isActive: true, iaOnly: { $ne: true } },
       { $set: { isActive: false } }
     );
     const deactivatedCount = deactivated.modifiedCount || 0;
+
+    // Ensure IA-only subjects (TOK Essay, TOK Exhibition) exist so they appear on Modules
+    const iaOnlySubjects = [
+      { name: 'TOK Essay', code: 'TOK-E', materialsPath: '', iaOnly: true },
+      { name: 'TOK Exhibition', code: 'TOK-X', materialsPath: '', iaOnly: true },
+    ];
+    for (const sub of iaOnlySubjects) {
+      await Subject.findOneAndUpdate(
+        { name: sub.name },
+        { $set: { name: sub.name, code: sub.code, materialsPath: sub.materialsPath || '', iaOnly: true, isActive: true } },
+        { upsert: true, new: true }
+      );
+    }
 
     const message =
       deactivatedCount > 0

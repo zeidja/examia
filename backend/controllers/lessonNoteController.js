@@ -81,7 +81,7 @@ export const update = async (req, res) => {
     const doc = await LessonNote.findOne({ _id: id, user: req.user._id });
     if (!doc) return res.status(404).json({ success: false, message: 'Lesson note not found' });
 
-    const { lessonTitle, summary, key_terms, self_test, confidence_score, recall_scores } = req.body || {};
+    const { lessonTitle, summary, key_terms, self_test, confidence_score, free_notes, recall_scores } = req.body || {};
 
     if (lessonTitle !== undefined) doc.lessonTitle = String(lessonTitle).trim() || 'New lesson';
 
@@ -118,6 +118,8 @@ export const update = async (req, res) => {
       doc.confidence_score = Math.round(n);
     }
 
+    if (free_notes !== undefined) doc.free_notes = String(free_notes ?? '').trim();
+
     if (recall_scores !== undefined) {
       if (!Array.isArray(recall_scores) || recall_scores.some((r) => !RECALL_VALUES.includes(Number(r)))) {
         return res.status(400).json({ success: false, message: 'recall_scores must be an array of 1, 2, 3, or 4' });
@@ -130,5 +132,22 @@ export const update = async (req, res) => {
     res.json({ success: true, note: populated });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message || 'Failed to update lesson note' });
+  }
+};
+
+/** DELETE /lesson-notes/:id — delete (student owner only). */
+export const remove = async (req, res) => {
+  try {
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ success: false, message: 'Only students can delete their own lesson notes' });
+    }
+    const { id } = req.params;
+    if (!isValidId(id)) return res.status(400).json({ success: false, message: 'Invalid note id' });
+    const doc = await LessonNote.findOne({ _id: id, user: req.user._id });
+    if (!doc) return res.status(404).json({ success: false, message: 'Lesson note not found' });
+    await LessonNote.deleteOne({ _id: id });
+    res.json({ success: true, message: 'Lesson note deleted' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message || 'Failed to delete lesson note' });
   }
 };

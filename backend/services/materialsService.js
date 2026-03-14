@@ -5,6 +5,8 @@ import { extractTextFromBuffer } from '../utils/extractText.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MATERIALS_PATH = path.resolve(__dirname, '../../materials');
+const DEFINITIONS_PATH = path.resolve(__dirname, '../../Definitions');
+const CHECKLISTS_PATH = path.resolve(__dirname, '../../Checklists');
 
 const mimeByExt = {
   '.pdf': 'application/pdf',
@@ -236,4 +238,133 @@ export async function getSubjectMaterialsText(subjectName, maxChars = 200000) {
     }
   }
   return out.trim();
+}
+
+/**
+ * List definition files for a subject. Definitions folder contains docx files named like "Biology Definitions.docx".
+ * Matches by subject name (case-insensitive, normalized). Returns [] if folder missing or no match.
+ */
+export async function getDefinitionsForSubject(subjectName) {
+  const name = (subjectName || '').trim();
+  if (!name) return [];
+  try {
+    const entries = await fs.readdir(DEFINITIONS_PATH, { withFileTypes: true });
+    const files = [];
+    const normalizedSubject = name.toLowerCase().replace(/\s+/g, ' ');
+    const subjectWords = normalizedSubject.split(' ').filter(Boolean);
+    for (const ent of entries) {
+      if (!ent.isFile() || ent.name.startsWith('.')) continue;
+      const ext = path.extname(ent.name).toLowerCase();
+      if (ext !== '.docx' && ext !== '.doc' && ext !== '.pdf' && ext !== '.txt') continue;
+      const baseName = path.basename(ent.name, ext).toLowerCase().replace(/\s+/g, ' ');
+      const match =
+        baseName.includes(normalizedSubject) ||
+        baseName.includes(normalizedSubject.replace(/\s/g, '')) ||
+        subjectWords.every((w) => baseName.includes(w));
+      if (match) {
+        files.push({ name: ent.name, relativePath: ent.name });
+      }
+    }
+    return files.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (err) {
+    if (err.code === 'ENOENT') return [];
+    throw err;
+  }
+}
+
+/**
+ * Resolve a definitions file path (basename only) to full path. Prevents path traversal.
+ */
+export function resolveDefinitionsPath(basename) {
+  if (!basename || typeof basename !== 'string') return null;
+  const safe = path.basename(basename).replace(/\.\./g, '');
+  const full = path.resolve(DEFINITIONS_PATH, safe);
+  if (!full.startsWith(DEFINITIONS_PATH)) return null;
+  return full;
+}
+
+/** Map subject name / materialsPath to Checklists folder name (e.g. "Biology" -> "Biology Checklists"). */
+const CHECKLIST_FOLDER_ALIASES = {
+  'biology': 'Biology Checklists',
+  'business': 'Business Checklists',
+  'chemistry': 'Chemistry Checklists',
+  'economics': 'Economics Checklists',
+  'psychology': 'Psychology Checklists',
+  'physics': 'Physics Checklists',
+  'mathematics - analysis & approaches': 'Math AA Checklists',
+  'math aa': 'Math AA Checklists',
+  'mathaa': 'Math AA Checklists',
+  'mathematics - application & interpretation': 'Math AI Checklists',
+  'math ai': 'Math AI Checklists',
+  'mathai': 'Math AI Checklists',
+  'global politics': 'Global Politics Checklists',
+  'globalpolitics': 'Global Politics Checklists',
+};
+
+/**
+ * Resolve subject name to the Checklists subfolder name (e.g. "Biology" -> "Biology Checklists").
+ * Returns null if no matching folder.
+ */
+export async function getChecklistsFolderForSubject(subjectName) {
+  const name = (subjectName || '').trim();
+  if (!name) return null;
+  try {
+    const entries = await fs.readdir(CHECKLISTS_PATH, { withFileTypes: true });
+    const normalizedSubject = name.toLowerCase().replace(/\s+/g, ' ');
+    const alias = CHECKLIST_FOLDER_ALIASES[normalizedSubject] || CHECKLIST_FOLDER_ALIASES[normalizedSubject.replace(/\s/g, '')];
+    if (alias) {
+      const exists = entries.some((e) => e.isDirectory() && e.name === alias);
+      return exists ? alias : null;
+    }
+    for (const ent of entries) {
+      if (!ent.isDirectory() || ent.name.startsWith('.')) continue;
+      const folderKey = ent.name.replace(/\s*checklists\s*$/i, '').trim().toLowerCase();
+      if (!folderKey) continue;
+      if (folderKey === normalizedSubject || normalizedSubject.includes(folderKey) || folderKey.includes(normalizedSubject)) return ent.name;
+      const subjectWords = normalizedSubject.split(/\s+/).filter(Boolean);
+      if (subjectWords.some((w) => folderKey.includes(w)) || folderKey.split(/\s+/).every((w) => normalizedSubject.includes(w))) return ent.name;
+    }
+    return null;
+  } catch (err) {
+    if (err.code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
+const CHECKLIST_EXT = ['.pdf', '.doc', '.docx', '.txt', '.dotx'];
+
+/**
+ * List all checklist files for a subject (recursive under subject's folder in Checklists).
+ * Returns [] if folder missing or no match. relativePath is from Checklists root (e.g. "Biology Checklists/C1.3.docx").
+ */
+export async function getChecklistFilesForSubject(subjectName) {
+  const folderName = await getChecklistsFolderForSubject(subjectName);
+  if (!folderName) return [];
+  const subjectPath = path.join(CHECKLISTS_PATH, folderName);
+  try {
+    const files = await listFilesRecursive(subjectPath);
+    const list = [];
+    for (const fullPath of files) {
+      const ext = path.extname(fullPath).toLowerCase();
+      if (!CHECKLIST_EXT.includes(ext)) continue;
+      const rel = path.relative(CHECKLISTS_PATH, fullPath);
+      const relativePath = rel.split(path.sep).join('/');
+      list.push({ name: path.basename(fullPath), relativePath });
+    }
+    return list.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  } catch (err) {
+    if (err.code === 'ENOENT') return [];
+    throw err;
+  }
+}
+
+/**
+ * Resolve a checklists file path (relative to Checklists root) to full path. Prevents path traversal.
+ */
+export function resolveChecklistsPath(relativePath) {
+  if (!relativePath || typeof relativePath !== 'string') return null;
+  const normalized = path.normalize(relativePath.replace(/\//g, path.sep)).replace(/^(\.\.(\/|\\|$))+/, '');
+  const full = path.resolve(CHECKLISTS_PATH, normalized);
+  if (!full.startsWith(CHECKLISTS_PATH)) return null;
+  return full;
 }

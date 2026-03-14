@@ -26,6 +26,8 @@ const lessonNoteSchema = new mongoose.Schema(
     key_terms: { type: [keyTermSchema], default: [] },
     self_test: { type: [selfTestItemSchema], default: [] },
     confidence_score: { type: Number, default: 0, min: 0, max: 100 },
+    /** Free-form text: student can type whatever they want. */
+    free_notes: { type: String, default: '', trim: true },
     recall_scores: {
       type: [Number],
       default: [],

@@ -9,5 +9,6 @@ router.post('/', authorize('student'), lessonNoteController.create);
 router.get('/', lessonNoteController.list);
 router.get('/:id', lessonNoteController.getOne);
 router.put('/:id', authorize('student'), lessonNoteController.update);
+router.delete('/:id', authorize('student'), lessonNoteController.remove);
 
 export default router;

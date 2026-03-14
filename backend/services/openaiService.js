@@ -18,6 +18,10 @@ import { MATH_AA_IDEA_GENERATOR_SYSTEM_PROMPT, MATH_AA_IDEA_CONFIG_JSON } from '
 import { MATH_AI_IDEA_GENERATOR_SYSTEM_PROMPT, MATH_AI_IDEA_CONFIG_JSON } from '../config/mathAIIdeaGenerator.js';
 import { PHYSICS_IDEA_GENERATOR_SYSTEM_PROMPT, PHYSICS_IDEA_CONFIG_JSON } from '../config/physicsIdeaGenerator.js';
 import { PSYCHOLOGY_IDEA_GENERATOR_SYSTEM_PROMPT, PSYCHOLOGY_IDEA_CONFIG_JSON } from '../config/psychologyIdeaGenerator.js';
+import { TOK_ESSAY_IA_REVISION_SYSTEM_PROMPT, TOK_ESSAY_IA_CONFIG_JSON } from '../config/tokEssayIARevision.js';
+import { TOK_ESSAY_IDEA_GENERATOR_SYSTEM_PROMPT, TOK_ESSAY_IDEA_CONFIG_JSON } from '../config/tokEssayIdeaGenerator.js';
+import { TOK_EXHIBITION_IA_REVISION_SYSTEM_PROMPT, TOK_EXHIBITION_IA_CONFIG_JSON } from '../config/tokExhibitionIARevision.js';
+import { TOK_EXHIBITION_IDEA_GENERATOR_SYSTEM_PROMPT, TOK_EXHIBITION_IDEA_CONFIG_JSON } from '../config/tokExhibitionIdeaGenerator.js';
 import { FEYNMAN_AGENT_SYSTEM_PROMPT } from '../config/feynmanAgent.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -527,6 +531,12 @@ function getIdeasSystemPrompt(subjectName) {
   if (lower.includes('psycholog')) {
     return PSYCHOLOGY_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + PSYCHOLOGY_IDEA_CONFIG_JSON;
   }
+  if (lower.includes('tok essay')) {
+    return TOK_ESSAY_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + TOK_ESSAY_IDEA_CONFIG_JSON;
+  }
+  if (lower.includes('tok exhibition')) {
+    return TOK_EXHIBITION_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + TOK_EXHIBITION_IDEA_CONFIG_JSON;
+  }
   return `You are an IB tutor helping students generate project and assessment ideas for ${name}. Use the conversation to ask clarifying questions when needed, then suggest structured ideas. Be concise and aligned with IB standards.`;
 }
 
@@ -552,6 +562,9 @@ export async function ideasChat(messages, subjectName, resourcesContext = '') {
 export async function reviewSubmission(type, content, subject = '') {
   const subjectName = typeof subject === 'string' ? subject : (subject?.name ?? '') || '';
   const lower = subjectName.toLowerCase();
+  if (type === 'external_assessment' && lower.includes('tok essay')) {
+    return tokEssayFeedback(content);
+  }
   if (type === 'internal_assessment') {
     if (lower.includes('biology')) return biologyIARevisionFeedback(content);
     if (lower.includes('business')) return businessIARevisionFeedback(content);
@@ -563,6 +576,7 @@ export async function reviewSubmission(type, content, subject = '') {
     }
     if (lower.includes('physic')) return physicsIARevisionFeedback(content);
     if (lower.includes('psycholog')) return psychologyIARevisionFeedback(content);
+    if (lower.includes('tok exhibition')) return tokExhibitionIARevisionFeedback(content);
   }
   const key = type === 'internal_assessment' ? 'review_internal_assessment' : type === 'external_assessment' ? 'review_external_assessment' : 'review_tok';
   return generateWithPrompt(key, { content, subject: subjectName || 'General' });
@@ -737,6 +751,46 @@ export async function psychologyIARevisionFeedback(iaDraftText) {
   const userContent =
     'Evaluate this IB Psychology IA research proposal draft. Provide diagnostic, criterion-aligned feedback using only the headings and structure specified. Do not assign marks or rewrite the proposal.\n\n--- Student\'s draft ---\n\n' +
     (iaDraftText || '').trim();
+  const completion = await openai.chat.completions.create({
+    model,
+    messages: [
+      { role: 'system', content: systemContent },
+      { role: 'user', content: userContent },
+    ],
+    temperature: 0.4,
+  });
+  return completion.choices?.[0]?.message?.content ?? '';
+}
+
+/** TOK Essay Feedback Coach: diagnostic feedback using CONFIG. Used when subject is TOK Essay and type is external_assessment. */
+export async function tokEssayFeedback(essayText) {
+  const systemContent =
+    TOK_ESSAY_IA_REVISION_SYSTEM_PROMPT +
+    '\n\n--- TOK Essay CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
+    TOK_ESSAY_IA_CONFIG_JSON;
+  const userContent =
+    'Review this TOK Essay draft. Provide diagnostic feedback following your instructions. Use only the headings and structure specified (Overall Alignment, Strengths vs Limitations table, Targeted Revision Guidance). Do not assign marks or rewrite paragraphs.\n\n--- Student\'s draft ---\n\n' +
+    (essayText || '').trim();
+  const completion = await openai.chat.completions.create({
+    model,
+    messages: [
+      { role: 'system', content: systemContent },
+      { role: 'user', content: userContent },
+    ],
+    temperature: 0.4,
+  });
+  return completion.choices?.[0]?.message?.content ?? '';
+}
+
+/** TOK Exhibition Feedback Coach: revision feedback using CONFIG. Used when subject is TOK Exhibition and type is internal_assessment. */
+export async function tokExhibitionIARevisionFeedback(exhibitionText) {
+  const systemContent =
+    TOK_EXHIBITION_IA_REVISION_SYSTEM_PROMPT +
+    '\n\n--- TOK Exhibition CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
+    TOK_EXHIBITION_IA_CONFIG_JSON;
+  const userContent =
+    'Review this TOK Exhibition draft. Provide revision feedback following your instructions. Use only the structure specified (Critical issues, Object-by-object feedback, TOK thinking overview, Strengths vs limitations table, Revision checklist). Do not assign marks or rewrite commentary.\n\n--- Student\'s draft ---\n\n' +
+    (exhibitionText || '').trim();
   const completion = await openai.chat.completions.create({
     model,
     messages: [

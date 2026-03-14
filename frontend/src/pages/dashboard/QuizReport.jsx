@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 
 export function QuizReport() {
   const { resourceId } = useParams();
+  const navigate = useNavigate();
   const [attempts, setAttempts] = useState([]);
   const [resourceTitle, setResourceTitle] = useState('');
   const [loading, setLoading] = useState(true);
@@ -51,14 +52,14 @@ export function QuizReport() {
     return (
       <div className="text-center py-12">
         <p className="text-red-600 mb-2">{error}</p>
-        <Link to="/resources" className="text-examia-mid font-medium hover:text-examia-dark">← Back to My resources</Link>
+        <button type="button" onClick={() => navigate(-1)} className="text-examia-mid font-medium hover:text-examia-dark">← Back</button>
       </div>
     );
   }
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-      <Link to="/resources" className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to My resources</Link>
+      <button type="button" onClick={() => navigate(-1)} className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back</button>
       <h1 className="text-2xl font-bold text-examia-dark mb-2">Quiz report: {resourceTitle}</h1>
       <p className="text-examia-mid mb-6">Student marks and improvement tips for wrong answers.</p>
 

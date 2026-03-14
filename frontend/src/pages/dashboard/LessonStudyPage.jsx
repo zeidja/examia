@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useParams, useNavigate, useOutletContext } from 'react-router-dom';
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
@@ -135,7 +135,7 @@ export function LessonStudyPage() {
   const [recallRating, setRecallRating] = useState(null);
   const [recallDraft, setRecallDraft] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
-  const [sectionOpen, setSectionOpen] = useState({ summary: true, terms: true, selfTest: true, confidence: true });
+  const [sectionOpen, setSectionOpen] = useState({ freeNotes: true, summary: true, terms: true, selfTest: true, confidence: true });
   const lastSaveRef = useRef(null);
   const saveTimeoutRef = useRef(null);
   const noteRef = useRef(note);
@@ -239,9 +239,9 @@ export function LessonStudyPage() {
     return (
       <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl border-2 border-red-200 bg-red-50/50 p-6 text-center">
         <p className="font-medium text-red-800">{error || 'Lesson not found'}</p>
-        <Link to={`/content/subject/${subjectId}/notes`} className="mt-4 inline-block text-sm font-medium text-examia-dark hover:underline">
-          ← Back to notes
-        </Link>
+        <button type="button" onClick={() => navigate(-1)} className="mt-4 inline-block text-sm font-medium text-examia-dark hover:underline">
+          ← Back
+        </button>
       </motion.section>
     );
   }
@@ -249,6 +249,7 @@ export function LessonStudyPage() {
   const summary = Array.isArray(note.summary) ? note.summary : ['', '', '', '', ''];
   const keyTerms = Array.isArray(note.key_terms) ? note.key_terms : [];
   const selfTest = Array.isArray(note.self_test) ? note.self_test : [];
+  const freeNotes = typeof note.free_notes === 'string' ? note.free_notes : '';
 
   return (
     <motion.section
@@ -259,15 +260,16 @@ export function LessonStudyPage() {
     >
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <Link
-            to={`/content/subject/${subjectId}/notes`}
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
             className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium text-examia-mid hover:text-examia-dark transition"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Notes
-          </Link>
+            Back
+          </button>
           {recallMode && !recallRevealed ? (
             <h1 className="text-xl font-bold text-examia-dark">Recall mode</h1>
           ) : editingTitle && canEdit ? (
@@ -353,6 +355,13 @@ export function LessonStudyPage() {
             </>
           ) : (
             <>
+              <p className="text-sm font-medium text-examia-dark">Summary (for comparison)</p>
+              <ul className="list-disc list-inside text-sm text-examia-dark space-y-1 mb-4">
+                {summary.filter(Boolean).map((bullet, i) => (
+                  <li key={i}>{bullet}</li>
+                ))}
+                {summary.filter(Boolean).length === 0 && <li className="text-examia-mid">No summary bullets.</li>}
+              </ul>
               <p className="text-sm font-medium text-examia-dark">How well did you recall?</p>
               <div className="flex flex-wrap gap-2">
                 {[
@@ -377,38 +386,61 @@ export function LessonStudyPage() {
       )}
 
       <SectionCard
-        title="Summary (max 5 bullets)"
+        title="My notes"
         icon={
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
         }
-        open={sectionOpen.summary}
-        onToggle={() => setSectionOpen((s) => ({ ...s, summary: !s.summary }))}
+        open={sectionOpen.freeNotes !== false}
+        onToggle={() => setSectionOpen((s) => ({ ...s, freeNotes: !s.freeNotes }))}
       >
-        <p className="text-xs font-semibold text-examia-mid uppercase tracking-wider mb-3">
-          {summaryUsed} / {SUMMARY_MAX} used
-        </p>
-        <div className="space-y-2">
-          {summary.slice(0, SUMMARY_MAX).map((val, i) => (
-            <input
-              key={i}
-              type="text"
-              value={val}
-              onChange={(e) => {
-                const next = [...summary];
-                next[i] = e.target.value.slice(0, SUMMARY_CHAR_MAX);
-                updateLocal({ summary: next });
-              }}
-              onBlur={() => saveNote({ ...note, summary })}
-              placeholder={`Bullet ${i + 1} (max ${SUMMARY_CHAR_MAX} chars)`}
-              maxLength={SUMMARY_CHAR_MAX}
-              disabled={!canEdit}
-              className="w-full rounded-lg border border-examia-soft/40 px-4 py-2.5 text-sm text-examia-dark placeholder:text-examia-mid focus:outline-none focus:ring-2 focus:ring-examia-dark/20 focus:border-examia-dark/30 disabled:bg-examia-soft/10 disabled:cursor-not-allowed"
-            />
-          ))}
-        </div>
+        <textarea
+          value={freeNotes}
+          onChange={(e) => updateLocal({ free_notes: e.target.value })}
+          onBlur={() => saveNote({ ...note, free_notes: freeNotes })}
+          placeholder="Type anything you want: ideas, reminders, extra notes…"
+          rows={5}
+          disabled={!canEdit}
+          className="w-full rounded-xl border border-examia-soft/40 px-4 py-3 text-sm text-examia-dark placeholder:text-examia-mid focus:outline-none focus:ring-2 focus:ring-examia-dark/20 resize-y disabled:bg-examia-soft/10 disabled:cursor-not-allowed"
+        />
       </SectionCard>
+
+      {!recallMode && (
+        <SectionCard
+          title="Summary (max 5 bullets)"
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+            </svg>
+          }
+          open={sectionOpen.summary}
+          onToggle={() => setSectionOpen((s) => ({ ...s, summary: !s.summary }))}
+        >
+          <p className="text-xs font-semibold text-examia-mid uppercase tracking-wider mb-3">
+            {summaryUsed} / {SUMMARY_MAX} used
+          </p>
+          <div className="space-y-2">
+            {summary.slice(0, SUMMARY_MAX).map((val, i) => (
+              <input
+                key={i}
+                type="text"
+                value={val}
+                onChange={(e) => {
+                  const next = [...summary];
+                  next[i] = e.target.value.slice(0, SUMMARY_CHAR_MAX);
+                  updateLocal({ summary: next });
+                }}
+                onBlur={() => saveNote({ ...note, summary })}
+                placeholder={`Bullet ${i + 1} (max ${SUMMARY_CHAR_MAX} chars)`}
+                maxLength={SUMMARY_CHAR_MAX}
+                disabled={!canEdit}
+                className="w-full rounded-lg border border-examia-soft/40 px-4 py-2.5 text-sm text-examia-dark placeholder:text-examia-mid focus:outline-none focus:ring-2 focus:ring-examia-dark/20 focus:border-examia-dark/30 disabled:bg-examia-soft/10 disabled:cursor-not-allowed"
+              />
+            ))}
+          </div>
+        </SectionCard>
+      )}
 
       <SectionCard
         title="Key terms"

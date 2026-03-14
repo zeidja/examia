@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
@@ -491,6 +491,7 @@ function QuizViewer({ questions, resourceId }) {
 
 export function ContentView() {
   const { id, resourceId, subjectId } = useParams();
+  const navigate = useNavigate();
   const effectiveId = resourceId || id;
   const [resource, setResource] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -522,11 +523,7 @@ export function ContentView() {
     return (
       <div className="text-center py-12">
         <p className="text-examia-mid">Content not found.</p>
-        {subjectId ? (
-          <Link to={`/content/subject/${subjectId}`} className="text-examia-mid font-medium mt-2 inline-block">← Back to subject</Link>
-        ) : (
-          <Link to="/content" className="text-examia-mid font-medium mt-2 inline-block">Back to Modules</Link>
-        )}
+        <button type="button" onClick={() => navigate(-1)} className="text-examia-mid font-medium mt-2 inline-block hover:text-examia-dark">← Back</button>
       </div>
     );
   }
@@ -537,13 +534,7 @@ export function ContentView() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      {subjectId && resource?.type === 'quiz' ? (
-        <Link to={`/content/subject/${subjectId}/quizzes`} className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to Quizzes</Link>
-      ) : subjectId && resource?.type === 'flash_cards' ? (
-        <Link to={`/content/subject/${subjectId}/flash-cards`} className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to Flashcards</Link>
-      ) : (
-        <Link to="/content" className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back to Modules</Link>
-      )}
+      <button type="button" onClick={() => navigate(-1)} className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back</button>
       <h1 className="text-2xl font-bold text-examia-dark mb-2">{resource.title}</h1>
       {resource.description && <p className="text-examia-mid mb-6">{resource.description}</p>}
 

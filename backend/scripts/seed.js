@@ -223,6 +223,19 @@ async function seed() {
     }
     console.log('Subjects synced from materials folder:', subjectsFromFiles.map((s) => s.name).join(', '));
   }
+  // IA-only subjects (no materials, quizzes, flashcards, notes; only Feedback + Ideas)
+  const iaOnlySubjects = [
+    { name: 'TOK Essay', code: 'TOK-E', materialsPath: '', iaOnly: true },
+    { name: 'TOK Exhibition', code: 'TOK-X', materialsPath: '', iaOnly: true },
+  ];
+  for (const sub of iaOnlySubjects) {
+    await Subject.findOneAndUpdate(
+      { name: sub.name },
+      { $set: { name: sub.name, code: sub.code, materialsPath: sub.materialsPath || '', iaOnly: true, isActive: true } },
+      { upsert: true, new: true }
+    );
+  }
+  console.log('IA-only subjects ensured:', iaOnlySubjects.map((s) => s.name).join(', '));
   const superAdmin = await User.findOne({ role: 'super_admin' });
   if (!superAdmin) {
     await User.create({

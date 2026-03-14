@@ -108,7 +108,7 @@ export function MyContent() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
-                onClick={() => navigate(`/content/subject/${s._id}/materials`)}
+                onClick={() => navigate(s.iaOnly ? `/content/subject/${s._id}/feedback` : `/content/subject/${s._id}/materials`)}
                 className={`rounded-2xl p-8 text-left hover:-translate-y-0.5 transition-all duration-200 group border ${cardStyle.className}`}
               >
                 <div className="flex items-center gap-4">

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
 
 import logoImg from '../../assets/logo.png';
 
@@ -126,49 +127,65 @@ const studentNavMain = [
   { to: '/content', label: 'Modules', end: true, icon: 'folder' },
 ];
 
-const studentSubjectTabsTop = [
+/** Tabs shown before the Internal Assessment dropdown (under Flashcards). */
+const studentSubjectTabsBeforeIA = [
   { toPath: 'materials', label: 'Fundamentals', icon: 'book' },
   { toPath: 'notes', label: 'Notes', icon: 'notes' },
   { toPath: 'quizzes', label: 'Quizzes', icon: 'clipboard' },
   { toPath: 'flash-cards', label: 'Flashcards', icon: 'cards' },
-  { toPath: 'insights', label: 'Insights', icon: 'insights' },
 ];
 
+/** Only Feedback Generator and Idea Generation live inside the Internal Assessment dropdown. */
 const studentSubjectTabsInternalAssessment = [
   { toPath: 'feedback', label: 'Feedback Generator', icon: 'fileCheck' },
   { toPath: 'ideas', label: 'Idea Generation', icon: 'lightbulb' },
+];
+
+/** Tabs shown after the Internal Assessment dropdown. */
+const studentSubjectTabsAfterIA = [
+  { toPath: 'insights', label: 'Insights', icon: 'insights' },
   { toPath: 'study-and-learn', label: 'Study Lab', icon: 'chat' },
   { toPath: 'feynman', label: 'Teach & Learn', icon: 'feynman' },
 ];
 
-function getStudentSubjectNav(subjectId) {
+const iaOnlySubjectTabs = [
+  { toPath: 'feedback', label: 'Feedback Generator', icon: 'fileCheck' },
+  { toPath: 'ideas', label: 'Idea Generation', icon: 'lightbulb' },
+];
+
+function getStudentSubjectNav(subjectId, subject) {
   if (!subjectId) return { main: studentNavMain, subjectId: null };
   const base = `/content/subject/${subjectId}`;
-  const topTabs = studentSubjectTabsTop.map((t) => ({ ...t, to: `${base}/${t.toPath}`, end: false }));
-  const iaTabs = studentSubjectTabsInternalAssessment.map((t) => ({ ...t, to: `${base}/${t.toPath}`, end: false }));
+  const iaOnly = subject?.iaOnly === true;
+  const mapTab = (t) => ({ ...t, to: `${base}/${t.toPath}`, end: false });
+  const tabsBeforeIA = iaOnly ? [] : studentSubjectTabsBeforeIA.map(mapTab);
+  const tabsAfterIA = iaOnly ? [] : studentSubjectTabsAfterIA.map(mapTab);
+  const iaTabsSource = iaOnly ? iaOnlySubjectTabs : studentSubjectTabsInternalAssessment;
+  const iaTabs = iaTabsSource.map(mapTab);
   return {
     main: studentNavMain,
     subjectId,
     subjectBase: base,
-    subjectTabsTop: topTabs,
+    subjectTabsBeforeIA: tabsBeforeIA,
+    subjectTabsAfterIA: tabsAfterIA,
     subjectTabsInternalAssessment: iaTabs,
   };
 }
 
-function getNav(role, location) {
+function getNav(role, location, subjectMeta) {
   if (role === 'super_admin') return { type: 'flat', items: superAdminNav };
   if (role === 'school_admin') return { type: 'flat', items: schoolAdminNav };
   if (role === 'teacher') return { type: 'flat', items: teacherNav };
   if (role === 'student') {
     const match = location?.pathname?.match(/^\/content\/subject\/([^/]+)/);
     const subjectId = match ? match[1] : null;
-    return { type: 'student', ...getStudentSubjectNav(subjectId) };
+    return { type: 'student', ...getStudentSubjectNav(subjectId, subjectMeta) };
   }
   return { type: 'flat', items: studentNavMain };
 }
 
-/** Student sidebar: Back to Modules, top tabs (Fundamentals, Quizzes, Flashcards), Internal Assessment dropdown. */
-function StudentSubjectNav({ subjectBase, subjectTabsTop, subjectTabsInternalAssessment, onNavigate, location, NavIcons, NavLink, Link }) {
+/** Student sidebar: Back (one step), tabs before IA, Internal Assessment dropdown, tabs after IA. */
+function StudentSubjectNav({ subjectTabsBeforeIA, subjectTabsAfterIA, subjectTabsInternalAssessment, onNavigate, onBack, location, NavIcons, NavLink }) {
   const pathname = location?.pathname || '';
   const isInternalAssessmentActive = subjectTabsInternalAssessment?.some((t) => pathname === t.to || pathname.startsWith(t.to + '/'));
   const [internalAssessmentOpen, setInternalAssessmentOpen] = useState(isInternalAssessmentActive);
@@ -178,31 +195,26 @@ function StudentSubjectNav({ subjectBase, subjectTabsTop, subjectTabsInternalAss
 
   const isOpen = internalAssessmentOpen || isInternalAssessmentActive;
 
+  const navItemClass = ({ isActive }) =>
+    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] transition-all duration-200 ${
+      isActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
+    }`;
+
   return (
     <div className="space-y-0.5 mt-6">
       <span className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-examia-soft/70">
         In this subject
       </span>
-      <Link
-        to="/content"
-        onClick={onNavigate}
-        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-examia-soft hover:bg-white/10 hover:text-white transition-all duration-200"
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-examia-soft hover:bg-white/10 hover:text-white transition-all duration-200 text-left"
       >
         {NavIcons.arrowLeft}
-        <span>Back to Modules</span>
-      </Link>
-      {subjectTabsTop?.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={false}
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] transition-all duration-200 ${
-              isActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
-            }`
-          }
-          onClick={onNavigate}
-        >
+        <span>Back</span>
+      </button>
+      {subjectTabsBeforeIA?.map((item) => (
+        <NavLink key={item.to} to={item.to} end={false} className={navItemClass} onClick={() => onNavigate(item.to)}>
           {item.icon && NavIcons[item.icon]}
           <span>{item.label}</span>
         </NavLink>
@@ -247,7 +259,7 @@ function StudentSubjectNav({ subjectBase, subjectTabsTop, subjectTabsInternalAss
                         isActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
                       }`
                     }
-                    onClick={onNavigate}
+                    onClick={() => onNavigate(item.to)}
                   >
                     {item.icon && NavIcons[item.icon]}
                     <span>{item.label}</span>
@@ -258,6 +270,12 @@ function StudentSubjectNav({ subjectBase, subjectTabsTop, subjectTabsInternalAss
           )}
         </AnimatePresence>
       </div>
+      {subjectTabsAfterIA?.map((item) => (
+        <NavLink key={item.to} to={item.to} end={false} className={navItemClass} onClick={() => onNavigate(item.to)}>
+          {item.icon && NavIcons[item.icon]}
+          <span>{item.label}</span>
+        </NavLink>
+      ))}
     </div>
   );
 }
@@ -265,11 +283,31 @@ function StudentSubjectNav({ subjectBase, subjectTabsTop, subjectTabsInternalAss
 export function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [subjectMeta, setSubjectMeta] = useState(null);
   const userMenuRef = useRef(null);
   const location = useLocation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const nav = useMemo(() => getNav(user?.role || 'student', location), [user?.role, location.pathname]);
+
+  const subjectIdFromPath = location?.pathname?.match(/^\/content\/subject\/([^/]+)/)?.[1] ?? null;
+  useEffect(() => {
+    if (user?.role !== 'student' || !subjectIdFromPath) {
+      setSubjectMeta(null);
+      return;
+    }
+    let cancelled = false;
+    api.get(`/subjects/${subjectIdFromPath}`).then((r) => {
+      if (!cancelled && r.data?.subject) setSubjectMeta(r.data.subject);
+    }).catch(() => {
+      if (!cancelled) setSubjectMeta(null);
+    });
+    return () => { cancelled = true; };
+  }, [user?.role, subjectIdFromPath]);
+
+  const nav = useMemo(
+    () => getNav(user?.role || 'student', location, subjectMeta),
+    [user?.role, location.pathname, subjectMeta]
+  );
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -332,14 +370,21 @@ export function DashboardLayout() {
               </div>
               {nav.subjectId && (
                 <StudentSubjectNav
-                  subjectBase={nav.subjectBase}
-                  subjectTabsTop={nav.subjectTabsTop}
+                  subjectTabsBeforeIA={nav.subjectTabsBeforeIA}
+                  subjectTabsAfterIA={nav.subjectTabsAfterIA}
                   subjectTabsInternalAssessment={nav.subjectTabsInternalAssessment}
-                  onNavigate={() => setSidebarOpen(false)}
+                  onNavigate={(toPath) => {
+                    const toSubjectId = toPath?.match?.(/^\/content\/subject\/([^/]+)/)?.[1];
+                    if (toSubjectId && toSubjectId === subjectIdFromPath) return;
+                    setSidebarOpen(false);
+                  }}
+                  onBack={() => {
+                    navigate(-1);
+                    setSidebarOpen(false);
+                  }}
                   location={location}
                   NavIcons={NavIcons}
                   NavLink={NavLink}
-                  Link={Link}
                 />
               )}
             </>
