@@ -18,6 +18,8 @@ const teacherResourceSchema = new mongoose.Schema(
     class: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', default: null },
     published: { type: Boolean, default: false },
     deadline: { type: Date, default: null },
+    availabilityStart: { type: Date, default: null }, // quiz only: students can attempt from this date/time
+    timeLimitMinutes: { type: Number, default: null }, // quiz only: time limit in minutes (student must finish within this)
   },
   { timestamps: true }
 );

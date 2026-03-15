@@ -6,9 +6,9 @@ import { uploadReviewSubmission } from '../middleware/upload.js';
 const router = express.Router();
 router.use(protect);
 
-// Only teachers (and admins) can generate quizzes and flash cards; students only access published content.
-router.post('/flash-cards', authorize('super_admin', 'school_admin', 'teacher'), aiController.generateFlashCardsHandler);
-router.post('/quizzes', authorize('super_admin', 'school_admin', 'teacher'), aiController.generateQuizzesHandler);
+// Only teachers and super_admin can generate quizzes and flash cards; school_admin is not allowed.
+router.post('/flash-cards', authorize('super_admin', 'teacher'), aiController.generateFlashCardsHandler);
+router.post('/quizzes', authorize('super_admin', 'teacher'), aiController.generateQuizzesHandler);
 router.post('/tok', authorize('super_admin', 'school_admin', 'teacher'), aiController.generateTOKHandler);
 router.post('/external-assessment', authorize('super_admin', 'school_admin', 'teacher'), aiController.generateExternalAssessmentHandler);
 router.post('/internal-assessment', authorize('super_admin', 'school_admin', 'teacher'), aiController.generateInternalAssessmentHandler);

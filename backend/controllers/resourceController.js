@@ -91,6 +91,12 @@ export const create = async (req, res) => {
       if (req.user.role === 'teacher' && req.user.subject) body.subject = req.user.subject._id || req.user.subject;
     }
     if (body.deadline === '' || body.deadline === null) body.deadline = undefined;
+    if (body.type === 'quiz' && body.availabilityStart !== undefined) {
+      body.availabilityStart = body.availabilityStart === '' || body.availabilityStart === null ? null : new Date(body.availabilityStart);
+    }
+    if (body.type === 'quiz' && body.timeLimitMinutes !== undefined) {
+      body.timeLimitMinutes = body.timeLimitMinutes === '' || body.timeLimitMinutes === null ? null : Math.max(1, Number(body.timeLimitMinutes) || 0) || null;
+    }
     const resource = await TeacherResource.create(body);
     const populated = await TeacherResource.findById(resource._id)
       .populate('createdBy', 'name')
@@ -184,7 +190,7 @@ export const update = async (req, res) => {
     if (req.user.role === 'teacher' && resource.createdBy.toString() !== req.user._id.toString()) {
       return res.status(403).json({ success: false, message: 'Not your resource' });
     }
-    const { title, description, class: classId, subject: subjectId, published, deadline } = req.body;
+    const { title, description, class: classId, subject: subjectId, published, deadline, availabilityStart, timeLimitMinutes } = req.body;
     const wasPublished = resource.published;
     if (title != null) resource.title = title;
     if (description != null) resource.description = description;
@@ -192,6 +198,12 @@ export const update = async (req, res) => {
     if (subjectId !== undefined) resource.subject = subjectId === '' || subjectId === null ? null : subjectId;
     if (typeof published === 'boolean') resource.published = published;
     if (deadline !== undefined) resource.deadline = deadline === '' || deadline === null ? null : new Date(deadline);
+    if (resource.type === 'quiz' && availabilityStart !== undefined) {
+      resource.availabilityStart = availabilityStart === '' || availabilityStart === null ? null : new Date(availabilityStart);
+    }
+    if (resource.type === 'quiz' && timeLimitMinutes !== undefined) {
+      resource.timeLimitMinutes = timeLimitMinutes === '' || timeLimitMinutes === null ? null : Math.max(1, Number(timeLimitMinutes) || 0) || null;
+    }
     await resource.save();
     if (!wasPublished && resource.published) {
       const schoolId = resource.school?._id || resource.school;

@@ -116,6 +116,9 @@ export function QuizReport() {
                   <div className="flex items-center gap-4">
                     <span className="font-bold text-examia-dark">{a.score} / {a.maxScore}</span>
                     <span className={`font-medium ${pct >= 70 ? 'text-green-600' : pct >= 50 ? 'text-amber-600' : 'text-red-600'}`}>{pct}%</span>
+                    {a.timeSpentSeconds != null && (
+                      <span className="text-examia-mid text-sm">{Math.floor(a.timeSpentSeconds / 60)}m {a.timeSpentSeconds % 60}s</span>
+                    )}
                     {wrongResults.length > 0 && (
                       <span className="text-examia-mid text-sm">{wrongResults.length} wrong — click for tips</span>
                     )}

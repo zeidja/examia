@@ -26,7 +26,7 @@ export function TeacherResources() {
   const [uploadFiles, setUploadFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ title: '', class: '', subject: '', deadline: '' });
+  const [editForm, setEditForm] = useState({ title: '', class: '', subject: '', availabilityStart: '', deadline: '', timeLimitMinutes: '' });
 
   const filteredResources = typeFilter
     ? resources.filter((r) => r.type === typeFilter)
@@ -60,7 +60,9 @@ export function TeacherResources() {
       title: r.title || '',
       class: (r.class?._id || r.class) || '',
       subject: (r.subject?._id || r.subject) || '',
+      availabilityStart: r.type === 'quiz' && r.availabilityStart ? new Date(r.availabilityStart).toISOString().slice(0, 16) : '',
       deadline: r.deadline ? new Date(r.deadline).toISOString().slice(0, 16) : '',
+      timeLimitMinutes: r.type === 'quiz' && r.timeLimitMinutes != null ? String(r.timeLimitMinutes) : '',
     });
   };
 
@@ -68,12 +70,18 @@ export function TeacherResources() {
     e.preventDefault();
     if (!editingId) return;
     try {
-      await api.put(`/resources/${editingId}`, {
+      const r = resources.find((res) => res._id === editingId);
+      const payload = {
         title: editForm.title,
         class: editForm.class || undefined,
         subject: editForm.subject || undefined,
-        deadline: editForm.deadline || null,
-      });
+        deadline: r?.type === 'flash_cards' ? null : (editForm.deadline || null),
+      };
+      if (r?.type === 'quiz') {
+        payload.availabilityStart = editForm.availabilityStart || null;
+        payload.timeLimitMinutes = editForm.timeLimitMinutes === '' ? null : (parseInt(editForm.timeLimitMinutes, 10) || null);
+      }
+      await api.put(`/resources/${editingId}`, payload);
       await fetchResources();
       setEditingId(null);
     } catch (err) {
@@ -250,8 +258,18 @@ export function TeacherResources() {
               <span className="text-xs font-medium text-examia-mid bg-examia-soft/20 px-2 py-1 rounded">{typeLabels[r.type] || r.type}</span>
               <h3 className="font-semibold text-examia-dark mt-2">{r.title}</h3>
               <p className="text-examia-mid text-sm">Subject: {r.subject?.name || '—'} · Class: {r.class?.name || '—'}</p>
-              {r.deadline && (
+              {r.type === 'quiz' && (r.availabilityStart || r.deadline) && (
+                <p className="text-examia-mid text-sm">
+                  {r.availabilityStart && `Start: ${new Date(r.availabilityStart).toLocaleString()}`}
+                  {r.availabilityStart && r.deadline && ' · '}
+                  {r.deadline && `End: ${new Date(r.deadline).toLocaleString()}`}
+                </p>
+              )}
+              {r.type === 'material' && r.deadline && (
                 <p className="text-examia-mid text-sm">Deadline: {new Date(r.deadline).toLocaleString()}</p>
+              )}
+              {r.type === 'quiz' && r.timeLimitMinutes != null && (
+                <p className="text-examia-mid text-sm">Time limit: {r.timeLimitMinutes} min</p>
               )}
               <span className={`text-xs font-medium px-2 py-1 rounded mt-2 inline-block ${r.published ? 'bg-green-100 text-green-700' : 'bg-examia-soft/20 text-examia-mid'}`}>
                 {r.published ? 'Published' : 'Draft'}
@@ -286,12 +304,44 @@ export function TeacherResources() {
                       <option key={c._id} value={c._id}>{c.name}</option>
                     ))}
                   </select>
-                  <input
-                    type="datetime-local"
-                    value={editForm.deadline}
-                    onChange={(e) => setEditForm((f) => ({ ...f, deadline: e.target.value }))}
-                    className="px-2 py-1.5 rounded-lg border border-examia-soft/50 text-sm"
-                  />
+                  {resources.find((res) => res._id === editingId)?.type === 'quiz' ? (
+                    <>
+                      <input
+                        type="datetime-local"
+                        title="Start — students can attempt from this time"
+                        value={editForm.availabilityStart}
+                        onChange={(e) => setEditForm((f) => ({ ...f, availabilityStart: e.target.value }))}
+                        className="px-2 py-1.5 rounded-lg border border-examia-soft/50 text-sm"
+                        placeholder="Start"
+                      />
+                      <input
+                        type="datetime-local"
+                        title="End — students cannot attempt after this time"
+                        value={editForm.deadline}
+                        onChange={(e) => setEditForm((f) => ({ ...f, deadline: e.target.value }))}
+                        className="px-2 py-1.5 rounded-lg border border-examia-soft/50 text-sm"
+                        placeholder="End"
+                      />
+                    </>
+                  ) : resources.find((res) => res._id === editingId)?.type === 'material' ? (
+                    <input
+                      type="datetime-local"
+                      value={editForm.deadline}
+                      onChange={(e) => setEditForm((f) => ({ ...f, deadline: e.target.value }))}
+                      className="px-2 py-1.5 rounded-lg border border-examia-soft/50 text-sm"
+                      placeholder="Deadline"
+                    />
+                  ) : null}
+                  {resources.find((res) => res._id === editingId)?.type === 'quiz' && (
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Time limit (min)"
+                      value={editForm.timeLimitMinutes}
+                      onChange={(e) => setEditForm((f) => ({ ...f, timeLimitMinutes: e.target.value }))}
+                      className="px-2 py-1.5 rounded-lg border border-examia-soft/50 text-sm w-28"
+                    />
+                  )}
                   <button type="submit" className="px-3 py-1.5 rounded-lg text-sm font-medium bg-examia-dark text-white">Save</button>
                   <button type="button" onClick={() => setEditingId(null)} className="px-3 py-1.5 rounded-lg text-sm text-examia-mid">Cancel</button>
                 </form>

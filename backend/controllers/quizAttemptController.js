@@ -28,6 +28,15 @@ function parseQuizContent(content) {
   }
 }
 
+/** Check quiz availability window; returns { allowed: boolean, message?: string }. */
+function checkQuizAvailability(resource, now = new Date()) {
+  const start = resource.availabilityStart ? new Date(resource.availabilityStart) : null;
+  const end = resource.deadline ? new Date(resource.deadline) : null;
+  if (start && now < start) return { allowed: false, message: `Quiz is not available yet. It opens at ${start.toLocaleString()}.` };
+  if (end && now > end) return { allowed: false, message: `Quiz has ended. It closed at ${end.toLocaleString()}.` };
+  return { allowed: true };
+}
+
 /** GET /resources/:id/quiz-attempt — current user's attempt for this quiz (student sees if already attempted) */
 export const getMyQuizAttempt = async (req, res) => {
   try {
@@ -43,6 +52,10 @@ export const getMyQuizAttempt = async (req, res) => {
     const attempt = await QuizAttempt.findOne({ resource: req.params.id, student: req.user._id })
       .populate('resource', 'title type')
       .lean();
+    if (req.user.role === 'student' && !attempt) {
+      const availability = checkQuizAvailability(resource);
+      if (!availability.allowed) return res.status(403).json({ success: false, message: availability.message });
+    }
     return res.json({ success: true, attempt: attempt || null });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -61,6 +74,9 @@ export const submitQuizAttempt = async (req, res) => {
     const userClassId = (req.user.class && (req.user.class._id || req.user.class))?.toString?.() ?? null;
     if (resourceClassId != null && resourceClassId !== userClassId) return res.status(403).json({ success: false, message: 'Not assigned to your class' });
 
+    const availability = checkQuizAvailability(resource);
+    if (!availability.allowed) return res.status(403).json({ success: false, message: availability.message });
+
     const existing = await QuizAttempt.findOne({ resource: req.params.id, student: req.user._id });
     if (existing) return res.status(403).json({ success: false, message: 'You have already attempted this quiz once.' });
 
@@ -68,6 +84,7 @@ export const submitQuizAttempt = async (req, res) => {
     if (!questions || !questions.length) return res.status(400).json({ success: false, message: 'Quiz has no valid questions' });
 
     const answers = Array.isArray(req.body.answers) ? req.body.answers : [];
+    const timeSpentSeconds = typeof req.body.timeSpentSeconds === 'number' && req.body.timeSpentSeconds >= 0 ? req.body.timeSpentSeconds : null;
     const maxScore = questions.length;
     let score = 0;
     const results = questions.map((q, i) => {
@@ -91,6 +108,7 @@ export const submitQuizAttempt = async (req, res) => {
       score,
       maxScore,
       results,
+      timeSpentSeconds: timeSpentSeconds ?? undefined,
     });
 
     const populated = await QuizAttempt.findById(attempt._id)

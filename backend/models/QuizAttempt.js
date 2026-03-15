@@ -21,6 +21,7 @@ const quizAttemptSchema = new mongoose.Schema(
     maxScore: { type: Number, required: true },
     results: [resultItemSchema],
     submittedAt: { type: Date, default: Date.now },
+    timeSpentSeconds: { type: Number, default: null }, // seconds taken to complete (from start to submit)
   },
   { timestamps: true }
 );

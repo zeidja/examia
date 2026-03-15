@@ -313,6 +313,7 @@ export const getTeacherStudentDetail = async (req, res) => {
         score: a.score ?? 0,
         maxScore: a.maxScore ?? 0,
         pct: a.maxScore > 0 ? Math.round((a.score / a.maxScore) * 100) : 0,
+        timeSpentSeconds: a.timeSpentSeconds ?? null,
       };
     });
 

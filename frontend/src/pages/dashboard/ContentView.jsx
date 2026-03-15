@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { useQuizFullscreen } from '../../context/QuizFullscreenContext';
 import { MarkdownBlock } from '../../components/MarkdownBlock';
 
 /** Parse stored content as flash cards (JSON array with front/back or question/answer) */
@@ -374,30 +375,103 @@ function QuizResultsView({ score, maxScore, results, alreadyAttempted }) {
   );
 }
 
-/** Student quiz UI: one question at a time, select answer, submit once to API */
-function QuizViewer({ questions, resourceId }) {
+/** Student quiz UI: one question at a time, select answer, submit once to API. Supports time limit and leave = auto-submit. */
+function QuizViewer({ questions, resourceId, timeLimitMinutes }) {
+  const navigate = useNavigate();
+  const { setQuizFullscreen } = useQuizFullscreen();
+  const [quizStarted, setQuizStarted] = useState(false);
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-  const [submittedResult, setSubmittedResult] = useState(null); // { score, maxScore, results } from API
+  const [submittedResult, setSubmittedResult] = useState(null);
+  const [secondsLeft, setSecondsLeft] = useState(timeLimitMinutes ? timeLimitMinutes * 60 : null);
+  const startTimeRef = useRef(null);
+  const selectedRef = useRef(selected);
+  const alreadySubmittedRef = useRef(false);
+  const hasUserInteractedRef = useRef(false);
+  selectedRef.current = selected;
+  if (submittedResult) alreadySubmittedRef.current = true;
 
-  const current = questions[index];
   const total = questions.length;
-  const selectedForCurrent = selected[index];
-  const isLast = index === total - 1;
+  const timed = timeLimitMinutes != null && timeLimitMinutes > 0;
 
-  const goPrev = () => setIndex((i) => (i <= 0 ? total - 1 : i - 1));
-  const goNext = () => setIndex((i) => (i >= total - 1 ? 0 : i + 1));
-  const selectOption = (optionIndex) => setSelected((s) => ({ ...s, [index]: optionIndex }));
+  useEffect(() => {
+    if (quizStarted) setQuizFullscreen(true);
+    return () => setQuizFullscreen(false);
+  }, [quizStarted, setQuizFullscreen]);
 
-  const handleSeeResults = async () => {
-    if (!resourceId || selectedForCurrent === undefined) return;
+  useEffect(() => {
+    if (submittedResult) setQuizFullscreen(false);
+  }, [submittedResult, setQuizFullscreen]);
+
+  useEffect(() => {
+    if (!quizStarted || !timed || secondsLeft == null || secondsLeft <= 0 || submittedResult) return;
+    const t = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev == null || prev <= 1) {
+          clearInterval(t);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [quizStarted, timed, submittedResult]);
+
+  useEffect(() => {
+    if (!timed || !resourceId || submittedResult || secondsLeft !== 0 || !quizStarted) return;
+    const submitOnTimeUp = async () => {
+      const answers = questions.map((_, i) => selectedRef.current[i] ?? -1);
+      const timeSpentSeconds = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : null;
+      setSubmitting(true);
+      setSubmitError(null);
+      try {
+        const { data } = await api.post(`/resources/${resourceId}/quiz-attempt`, { answers, timeSpentSeconds });
+        setSubmittedResult({ score: data.score, maxScore: data.maxScore, results: data.results || [] });
+      } catch (err) {
+        setSubmitError(err.response?.data?.message || err.message || 'Quiz auto-submitted; refresh to see result.');
+      } finally {
+        setSubmitting(false);
+      }
+    };
+    submitOnTimeUp();
+  }, [timed, resourceId, questions.length, secondsLeft, submittedResult]);
+
+  useEffect(() => {
+    if (!resourceId || !quizStarted) return;
+    const submitOnLeave = () => {
+      const answers = questions.map((_, i) => selectedRef.current[i] ?? -1);
+      const timeSpentSeconds = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : null;
+      const url = `/api/resources/${resourceId}/quiz-attempt`;
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers, timeSpentSeconds }),
+        credentials: 'include',
+        keepalive: true,
+      }).catch(() => {});
+    };
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = 'If you leave, your attempt will be submitted and you cannot attempt again. Leave anyway?';
+      submitOnLeave();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (hasUserInteractedRef.current && !alreadySubmittedRef.current) submitOnLeave();
+    };
+  }, [resourceId, questions.length, quizStarted]);
+
+  const submitQuiz = async () => {
+    if (!resourceId) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
       const answers = questions.map((_, i) => selected[i] ?? -1);
-      const { data } = await api.post(`/resources/${resourceId}/quiz-attempt`, { answers });
+      const timeSpentSeconds = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : null;
+      const { data } = await api.post(`/resources/${resourceId}/quiz-attempt`, { answers, timeSpentSeconds });
       setSubmittedResult({ score: data.score, maxScore: data.maxScore, results: data.results || [] });
     } catch (err) {
       setSubmitError(err.response?.data?.message || err.message || 'Failed to submit quiz');
@@ -410,13 +484,64 @@ function QuizViewer({ questions, resourceId }) {
     return <QuizResultsView score={submittedResult.score} maxScore={submittedResult.maxScore} results={submittedResult.results} alreadyAttempted={false} />;
   }
 
+  if (!quizStarted) {
+    return (
+      <div className="max-w-2xl mx-auto rounded-2xl border-2 border-examia-dark/20 bg-white p-8 shadow-lg">
+        <h3 className="text-xl font-bold text-examia-dark mb-4">Before you start</h3>
+        <p className="text-examia-dark mb-4">
+          You have <strong>one attempt only</strong>. If you leave this page (new tab, Home, refresh, or close), your attempt will be submitted with your current answers and you cannot attempt again. Unanswered questions will count as 0.
+        </p>
+        <p className="text-examia-mid text-sm mb-6">Are you ready to start?</p>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setQuizStarted(true);
+              startTimeRef.current = Date.now();
+            }}
+            className="px-6 py-3 rounded-xl bg-examia-dark text-white font-medium hover:bg-examia-mid transition"
+          >
+            Start quiz
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="px-6 py-3 rounded-xl border-2 border-examia-soft/50 text-examia-dark font-medium hover:bg-examia-soft/20 transition"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const current = questions[index];
+  const selectedForCurrent = selected[index];
+  const isLast = index === total - 1;
+  const goPrev = () => { hasUserInteractedRef.current = true; setIndex((i) => (i <= 0 ? total - 1 : i - 1)); };
+  const goNext = () => { hasUserInteractedRef.current = true; setIndex((i) => (i >= total - 1 ? 0 : i + 1)); };
+  const selectOption = (optionIndex) => { hasUserInteractedRef.current = true; setSelected((s) => ({ ...s, [index]: optionIndex })); };
+
   if (!current) return null;
 
   const options = current.options || [];
   const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+  const m = secondsLeft != null ? Math.floor(secondsLeft / 60) : 0;
+  const s = secondsLeft != null ? secondsLeft % 60 : 0;
 
   return (
     <div className="max-w-2xl mx-auto">
+      {timed && (
+        <div className="flex items-center justify-between mb-4 rounded-xl border-2 border-examia-dark/20 bg-examia-soft/10 px-4 py-2">
+          <span className="text-sm font-medium text-examia-dark">Time left</span>
+          <span className={`font-mono text-lg font-bold ${secondsLeft != null && secondsLeft <= 60 ? 'text-red-600' : 'text-examia-dark'}`}>
+            {m}:{String(s).padStart(2, '0')}
+          </span>
+        </div>
+      )}
+      {timed && (
+        <p className="text-center text-xs text-examia-mid mb-2">Don&apos;t leave this page — one attempt only. If you leave or time runs out, your answers will be submitted.</p>
+      )}
       <div className="text-center text-sm text-examia-mid mb-4">
         Question {index + 1} of {total}
       </div>
@@ -467,11 +592,11 @@ function QuizViewer({ questions, resourceId }) {
         {isLast ? (
           <button
             type="button"
-            onClick={handleSeeResults}
-            disabled={selectedForCurrent === undefined || submitting}
+            onClick={submitQuiz}
+            disabled={submitting || (!timed && selectedForCurrent === undefined)}
             className="px-5 py-2.5 rounded-xl bg-examia-dark text-white font-medium hover:bg-examia-mid transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {submitting ? 'Submitting…' : selectedForCurrent !== undefined ? 'Submit & see results' : 'Select an answer to finish'}
+            {submitting ? 'Submitting…' : timed ? 'Submit & see results' : selectedForCurrent !== undefined ? 'Submit & see results' : 'Select an answer to finish'}
           </button>
         ) : (
           <button
@@ -497,6 +622,7 @@ export function ContentView() {
   const [resource, setResource] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quizAttempt, setQuizAttempt] = useState(null);
+  const [quizAttemptError, setQuizAttemptError] = useState(null);
   const [attemptLoading, setAttemptLoading] = useState(false);
 
   useEffect(() => {
@@ -507,7 +633,15 @@ export function ContentView() {
   useEffect(() => {
     if (!effectiveId || !resource || resource.type !== 'quiz') return;
     setAttemptLoading(true);
-    api.get(`/resources/${effectiveId}/quiz-attempt`).then((r) => setQuizAttempt(r.data.attempt || null)).catch(() => setQuizAttempt(null)).finally(() => setAttemptLoading(false));
+    setQuizAttemptError(null);
+    api
+      .get(`/resources/${effectiveId}/quiz-attempt`)
+      .then((r) => { setQuizAttempt(r.data.attempt || null); setQuizAttemptError(null); })
+      .catch((err) => {
+        setQuizAttempt(null);
+        setQuizAttemptError(err.response?.data?.message || err.message || null);
+      })
+      .finally(() => setAttemptLoading(false));
   }, [effectiveId, resource?.type]);
 
   const flashCards = useMemo(() => resource?.type === 'flash_cards' ? parseFlashCards(resource?.content) : null, [resource]);
@@ -535,7 +669,9 @@ export function ContentView() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <button type="button" onClick={() => navigate(-1)} className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back</button>
+      {resource.type !== 'quiz' && (
+        <button type="button" onClick={() => navigate(-1)} className="text-sm text-examia-mid hover:text-examia-dark font-medium mb-4 inline-block">← Back</button>
+      )}
       <h1 className="text-2xl font-bold text-examia-dark mb-2">{resource.title}</h1>
       {resource.description && <p className="text-examia-mid mb-6">{resource.description}</p>}
 
@@ -544,10 +680,15 @@ export function ContentView() {
       ) : resource.type === 'quiz' && quizQuestions && quizQuestions.length > 0 ? (
         attemptLoading ? (
           <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-2 border-examia-mid border-t-transparent" /></div>
+        ) : quizAttemptError ? (
+          <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/80 p-6 text-center">
+            <p className="font-medium text-amber-800">{quizAttemptError}</p>
+            <p className="text-sm text-amber-700 mt-2">You can attempt this quiz only between the start and end times set by your teacher.</p>
+          </div>
         ) : quizAttempt ? (
           <QuizResultsView score={quizAttempt.score} maxScore={quizAttempt.maxScore} results={quizAttempt.results || []} alreadyAttempted />
         ) : (
-          <QuizViewer questions={quizQuestions} resourceId={effectiveId} />
+          <QuizViewer questions={quizQuestions} resourceId={effectiveId} timeLimitMinutes={resource.timeLimitMinutes} />
         )
       ) : (
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-examia-soft/30">

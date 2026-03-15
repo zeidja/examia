@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, NavLink, useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { QuizFullscreenContext } from '../context/QuizFullscreenContext';
 import api from '../api/axios';
 
 import logoImg from '../../assets/logo.png';
@@ -107,9 +108,6 @@ const schoolAdminNav = [
   { to: '/subjects', label: 'Subjects' },
   { to: '/classes', label: 'Classes' },
   { to: '/users', label: 'Users' },
-  { to: '/ai/flash-cards', label: 'Flashcards' },
-  { to: '/ai/quizzes', label: 'Quizzes' },
-  { to: '/resources', label: 'Resources' },
 ];
 
 const teacherNav = [
@@ -284,6 +282,7 @@ export function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [subjectMeta, setSubjectMeta] = useState(null);
+  const [quizFullscreen, setQuizFullscreen] = useState(false);
   const userMenuRef = useRef(null);
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -323,10 +322,11 @@ export function DashboardLayout() {
   };
 
   return (
+    <QuizFullscreenContext.Provider value={{ quizFullscreen, setQuizFullscreen }}>
     <div className="min-h-screen bg-examia-bg flex">
       <aside
         className={`fixed inset-y-0 left-0 z-40 w-[260px] bg-examia-dark text-white transform transition-transform duration-200 ease-out flex flex-col ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          quizFullscreen ? 'hidden' : sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         <div className="flex items-center justify-between h-[72px] px-5 border-b border-white/10 shrink-0">
@@ -413,8 +413,8 @@ export function DashboardLayout() {
         </nav>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-[260px]">
-        <header className="sticky top-0 z-30 h-[72px] bg-white/80 backdrop-blur-md border-b border-examia-soft/30 flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0">
+      <div className={`flex-1 flex flex-col min-w-0 ${quizFullscreen ? 'ml-0' : 'lg:ml-[260px]'}`}>
+        <header className={`sticky top-0 z-30 h-[72px] bg-white/80 backdrop-blur-md border-b border-examia-soft/30 flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0 ${quizFullscreen ? 'hidden' : ''}`}>
           <button
             type="button"
             className="lg:hidden p-2.5 rounded-xl text-examia-mid hover:bg-examia-soft/20 transition-colors"
@@ -485,12 +485,13 @@ export function DashboardLayout() {
         </main>
       </div>
 
-      {sidebarOpen && (
+      {!quizFullscreen && sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-30 lg:hidden pointer-events-none"
           aria-hidden
         />
       )}
     </div>
+    </QuizFullscreenContext.Provider>
   );
 }

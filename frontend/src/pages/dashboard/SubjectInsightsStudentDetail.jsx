@@ -93,7 +93,12 @@ export function SubjectInsightsStudentDetail() {
               {quizAttempts.map((q) => (
                 <div key={q.resourceId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-examia-soft/40 px-4 py-3">
                   <span className="font-medium text-examia-dark">{q.title}</span>
-                  <span className="text-sm text-examia-mid">{q.score} / {q.maxScore} — <strong>{q.pct}%</strong></span>
+                  <span className="text-sm text-examia-mid">
+                    {q.score} / {q.maxScore} — <strong>{q.pct}%</strong>
+                    {q.timeSpentSeconds != null && (
+                      <span className="ml-2 text-examia-mid">({Math.floor(q.timeSpentSeconds / 60)}m {q.timeSpentSeconds % 60}s)</span>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>

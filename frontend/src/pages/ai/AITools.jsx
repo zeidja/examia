@@ -21,6 +21,8 @@ function tabIdFromPath(pathSegment) {
 }
 
 const canGenerate = (role) => ['super_admin', 'school_admin', 'teacher'].includes(role);
+/** Only teachers (and super_admin) can generate quizzes and flashcards; school_admin is blocked. */
+const canGenerateQuizzesOrFlashcards = (role) => role === 'teacher' || role === 'super_admin';
 
 /** Try to parse AI result as JSON (strip markdown code blocks if present) */
 function tryParseResult(raw, type) {
@@ -300,7 +302,7 @@ export function AITools() {
   const [loading, setLoading] = useState(false);
   const [resultByTab, setResultByTab] = useState({}); // one result per tab: { flash_cards: '...', quizzes: '...', ... }
   const [showRawEdit, setShowRawEdit] = useState(false);
-  const [saveForm, setSaveForm] = useState({ title: '', class: '', deadline: '' });
+  const [saveForm, setSaveForm] = useState({ title: '', class: '', availabilityStart: '', deadline: '', timeLimitMinutes: '' });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({
@@ -316,10 +318,14 @@ export function AITools() {
   const teacherOnlyPaths = useMemo(() => ['flash-cards', 'quizzes'], []); // IA, EA, TOK are for students (upload & get feedback)
   useEffect(() => {
     if (tabParam && !validPaths.includes(tabParam)) {
-      navigate('/ai/flash-cards', { replace: true });
+      navigate(user?.role === 'school_admin' ? '/ai/tok' : '/ai/flash-cards', { replace: true });
       return;
     }
-    if ((user?.role === 'teacher' || user?.role === 'school_admin') && tabParam && !teacherOnlyPaths.includes(tabParam)) {
+    if (user?.role === 'school_admin' && tabParam && teacherOnlyPaths.includes(tabParam)) {
+      navigate('/ai/tok', { replace: true });
+      return;
+    }
+    if (canGenerateQuizzesOrFlashcards(user?.role) && tabParam && !teacherOnlyPaths.includes(tabParam)) {
       navigate('/ai/flash-cards', { replace: true });
     }
   }, [tabParam, validPaths, teacherOnlyPaths, user?.role, navigate]);
@@ -373,7 +379,7 @@ export function AITools() {
     if (canGenerate(user?.role)) api.get('/classes').then((r) => setClasses(r.data.classes || [])).catch(() => {});
   }, [user?.role]);
   useEffect(() => {
-    if (canGenerate(user?.role) && isFlashOrQuiz) {
+    if (canGenerateQuizzesOrFlashcards(user?.role) && isFlashOrQuiz) {
       api.get('/resources').then((r) => setMyResources(r.data.resources || [])).catch(() => setMyResources([]));
       api.get('/materials/tree').then((r) => setMaterialsTree(r.data)).catch(() => setMaterialsTree(null));
     }
@@ -440,16 +446,24 @@ export function AITools() {
       const type = activeTab === 'flash_cards' ? 'flash_cards' : activeTab === 'quizzes' ? 'quiz' : null;
       if (!type) return;
       const subjectId = form.subject ? (subjects.find((s) => s.name === form.subject)?._id || null) : null;
-      await api.post('/resources', {
+      const payload = {
         type,
         title: saveForm.title.trim(),
         content: currentResult,
         class: saveForm.class,
         subject: subjectId || undefined,
-        deadline: saveForm.deadline || undefined,
-      });
+        deadline: type === 'flash_cards' ? undefined : (saveForm.deadline || undefined),
+      };
+      if (type === 'quiz') {
+        if (saveForm.availabilityStart) payload.availabilityStart = saveForm.availabilityStart;
+        if (saveForm.timeLimitMinutes !== '') {
+          const mins = parseInt(saveForm.timeLimitMinutes, 10);
+          payload.timeLimitMinutes = mins >= 1 ? mins : undefined;
+        }
+      }
+      await api.post('/resources', payload);
       setSaved(true);
-      setSaveForm({ title: '', class: '', deadline: '' });
+      setSaveForm({ title: '', class: '', availabilityStart: '', deadline: '', timeLimitMinutes: '' });
     } catch (err) {
       await showError(err.response?.data?.message || 'Failed to save');
     } finally {
@@ -470,7 +484,7 @@ export function AITools() {
   }
 
   const result = resultByTab[activeTab] ?? '';
-  const showSaveOption = canGenerate(user?.role) && result && (activeTab === 'flash_cards' || activeTab === 'quizzes');
+  const showSaveOption = canGenerateQuizzesOrFlashcards(user?.role) && result && (activeTab === 'flash_cards' || activeTab === 'quizzes');
   const currentTabLabel = tabs.find((t) => t.id === activeTab)?.label || 'Generate';
 
   return (
@@ -676,13 +690,36 @@ export function AITools() {
                       <option key={c._id} value={c._id}>{c.name}</option>
                     ))}
                   </select>
-                  <input
-                    type="datetime-local"
-                    placeholder="Deadline (optional)"
-                    value={saveForm.deadline}
-                    onChange={(e) => setSaveForm((f) => ({ ...f, deadline: e.target.value }))}
-                    className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark"
-                  />
+                  {activeTab === 'quizzes' && (
+                    <>
+                      <input
+                        type="datetime-local"
+                        placeholder="Start (optional)"
+                        title="Students can attempt from this date/time"
+                        value={saveForm.availabilityStart}
+                        onChange={(e) => setSaveForm((f) => ({ ...f, availabilityStart: e.target.value }))}
+                        className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark"
+                      />
+                      <input
+                        type="datetime-local"
+                        placeholder="End (optional)"
+                        title="Students cannot attempt after this date/time"
+                        value={saveForm.deadline}
+                        onChange={(e) => setSaveForm((f) => ({ ...f, deadline: e.target.value }))}
+                        className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark"
+                      />
+                    </>
+                  )}
+                  {activeTab === 'quizzes' && (
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder="Time limit (min)"
+                      value={saveForm.timeLimitMinutes}
+                      onChange={(e) => setSaveForm((f) => ({ ...f, timeLimitMinutes: e.target.value }))}
+                      className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark w-32"
+                    />
+                  )}
                   <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg bg-examia-dark text-white font-medium disabled:opacity-60">
                     {saving ? 'Saving…' : 'Save'}
                   </button>
