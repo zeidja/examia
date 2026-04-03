@@ -84,7 +84,7 @@ const flatNavIcons = {
   'Reports': 'clipboard',
   'Subjects': 'book',
   'Fundamentals': 'folder',
-  'AI Prompts': 'lightbulb',
+  'AI configuration': 'lightbulb',
   'Users': 'folder',
   'Classes': 'clipboard',
   'Flashcards': 'cards',
@@ -99,7 +99,7 @@ const superAdminNav = [
   { to: '/reports', label: 'Reports' },
   { to: '/subjects', label: 'Subjects' },
   { to: '/materials', label: 'Fundamentals' },
-  { to: '/ai-prompts', label: 'AI Prompts' },
+  { to: '/ai-prompts', label: 'AI configuration' },
   { to: '/users', label: 'Users' },
 ];
 

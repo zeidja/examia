@@ -5,8 +5,8 @@ import { protect, authorize } from '../middleware/auth.js';
 const router = express.Router();
 router.use(protect);
 
-router.get('/', aiPromptController.getPrompts);
-router.get('/:key', aiPromptController.getPromptByKey);
+router.get('/', authorize('super_admin'), aiPromptController.getPrompts);
+router.get('/:key', authorize('super_admin'), aiPromptController.getPromptByKey);
 router.post('/', authorize('super_admin'), aiPromptController.createPrompt);
 router.put('/:key', authorize('super_admin'), aiPromptController.updatePrompt);
 

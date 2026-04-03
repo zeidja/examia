@@ -1,28 +1,5 @@
 import OpenAI from 'openai';
-import AIPrompt from '../models/AIPrompt.js';
-import { BIOLOGY_IA_REVISION_SYSTEM_PROMPT, BIOLOGY_IA_CONFIG_JSON } from '../config/biologyIARevision.js';
-import { BUSINESS_IA_REVISION_SYSTEM_PROMPT, BUSINESS_IA_CONFIG_JSON } from '../config/businessIARevision.js';
-import { CHEMISTRY_IA_REVISION_SYSTEM_PROMPT, CHEMISTRY_IA_CONFIG_JSON } from '../config/chemistryIARevision.js';
-import { ECONOMICS_IA_REVISION_SYSTEM_PROMPT, ECONOMICS_IA_CONFIG_JSON } from '../config/economicsIARevision.js';
-import { GLOBAL_POLITICS_IA_REVISION_SYSTEM_PROMPT, GLOBAL_POLITICS_IA_CONFIG_JSON } from '../config/globalPoliticsIARevision.js';
-import { MATH_AA_IA_REVISION_SYSTEM_PROMPT, MATH_AA_IA_CONFIG_JSON } from '../config/mathAAIARevision.js';
-import { MATH_AI_IA_REVISION_SYSTEM_PROMPT, MATH_AI_IA_CONFIG_JSON } from '../config/mathAIIARevision.js';
-import { PHYSICS_IA_REVISION_SYSTEM_PROMPT, PHYSICS_IA_CONFIG_JSON } from '../config/physicsIARevision.js';
-import { PSYCHOLOGY_IA_REVISION_SYSTEM_PROMPT, PSYCHOLOGY_IA_CONFIG_JSON } from '../config/psychologyIARevision.js';
-import { BIOLOGY_IDEA_GENERATOR_SYSTEM_PROMPT, BIOLOGY_IDEA_CONFIG_JSON } from '../config/biologyIdeaGenerator.js';
-import { BUSINESS_IDEA_GENERATOR_SYSTEM_PROMPT, BUSINESS_IDEA_CONFIG_JSON } from '../config/businessIdeaGenerator.js';
-import { CHEMISTRY_IDEA_GENERATOR_SYSTEM_PROMPT, CHEMISTRY_IDEA_CONFIG_JSON } from '../config/chemistryIdeaGenerator.js';
-import { ECONOMICS_IDEA_GENERATOR_SYSTEM_PROMPT, ECONOMICS_IDEA_CONFIG_JSON } from '../config/economicsIdeaGenerator.js';
-import { GLOBAL_POLITICS_IDEA_GENERATOR_SYSTEM_PROMPT, GLOBAL_POLITICS_IDEA_CONFIG_JSON } from '../config/globalPoliticsIdeaGenerator.js';
-import { MATH_AA_IDEA_GENERATOR_SYSTEM_PROMPT, MATH_AA_IDEA_CONFIG_JSON } from '../config/mathAAIdeaGenerator.js';
-import { MATH_AI_IDEA_GENERATOR_SYSTEM_PROMPT, MATH_AI_IDEA_CONFIG_JSON } from '../config/mathAIIdeaGenerator.js';
-import { PHYSICS_IDEA_GENERATOR_SYSTEM_PROMPT, PHYSICS_IDEA_CONFIG_JSON } from '../config/physicsIdeaGenerator.js';
-import { PSYCHOLOGY_IDEA_GENERATOR_SYSTEM_PROMPT, PSYCHOLOGY_IDEA_CONFIG_JSON } from '../config/psychologyIdeaGenerator.js';
-import { TOK_ESSAY_IA_REVISION_SYSTEM_PROMPT, TOK_ESSAY_IA_CONFIG_JSON } from '../config/tokEssayIARevision.js';
-import { TOK_ESSAY_IDEA_GENERATOR_SYSTEM_PROMPT, TOK_ESSAY_IDEA_CONFIG_JSON } from '../config/tokEssayIdeaGenerator.js';
-import { TOK_EXHIBITION_IA_REVISION_SYSTEM_PROMPT, TOK_EXHIBITION_IA_CONFIG_JSON } from '../config/tokExhibitionIARevision.js';
-import { TOK_EXHIBITION_IDEA_GENERATOR_SYSTEM_PROMPT, TOK_EXHIBITION_IDEA_CONFIG_JSON } from '../config/tokExhibitionIdeaGenerator.js';
-import { FEYNMAN_AGENT_SYSTEM_PROMPT } from '../config/feynmanAgent.js';
+import { loadActivePrompt, buildSystemPrompt } from './aiPromptLoader.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -35,16 +12,23 @@ function fillTemplate(template, vars = {}) {
   return out;
 }
 
+/** @deprecated Use loadActivePrompt from aiPromptLoader — kept for any external callers. */
 export async function getPromptConfig(key) {
-  const doc = await AIPrompt.findOne({ key, isActive: true });
-  return doc;
+  const pack = await loadActivePrompt(key);
+  if (!pack) return null;
+  return {
+    key,
+    systemPrompt: buildSystemPrompt(pack),
+    userPromptTemplate: pack.userPromptTemplate,
+    isActive: true,
+  };
 }
 
 export async function generateWithPrompt(key, userVars = {}, extraSystemContext = '') {
-  const config = await getPromptConfig(key);
-  if (!config) throw new Error(`AI prompt not found: ${key}`);
-  const systemPrompt = (config.systemPrompt || '') + (extraSystemContext ? '\n\n' + extraSystemContext : '');
-  const userContent = fillTemplate(config.userPromptTemplate, userVars);
+  const pack = await loadActivePrompt(key);
+  if (!pack) throw new Error(`AI prompt not found or disabled: ${key}`);
+  const systemPrompt = buildSystemPrompt(pack) + (extraSystemContext ? '\n\n' + extraSystemContext : '');
+  const userContent = fillTemplate(pack.userPromptTemplate || '', userVars);
   const completion = await openai.chat.completions.create({
     model,
     messages: [
@@ -57,6 +41,37 @@ export async function generateWithPrompt(key, userVars = {}, extraSystemContext 
   return text;
 }
 
+async function ideaGenCompletion(promptKey, userContent, temperature = 0.7) {
+  const pack = await loadActivePrompt(promptKey);
+  if (!pack) throw new Error(`AI prompt not found or disabled: ${promptKey}`);
+  const systemContent = buildSystemPrompt(pack);
+  const completion = await openai.chat.completions.create({
+    model,
+    messages: [
+      { role: 'system', content: systemContent },
+      { role: 'user', content: userContent },
+    ],
+    temperature,
+  });
+  return completion.choices?.[0]?.message?.content ?? '';
+}
+
+async function runRevisionCoach(promptKey, draftText) {
+  const pack = await loadActivePrompt(promptKey);
+  if (!pack) throw new Error(`Revision coach not found or disabled: ${promptKey}`);
+  const systemContent = buildSystemPrompt(pack);
+  const userContent = fillTemplate(pack.userPromptTemplate || '', { content: (draftText || '').trim() });
+  const completion = await openai.chat.completions.create({
+    model,
+    messages: [
+      { role: 'system', content: systemContent },
+      { role: 'user', content: userContent },
+    ],
+    temperature: 0.4,
+  });
+  return completion.choices?.[0]?.message?.content ?? '';
+}
+
 export async function generateFlashCards(subject, topic, count = 10, resourcesContext = '') {
   return generateWithPrompt(
     'flash_cards',
@@ -65,21 +80,9 @@ export async function generateFlashCards(subject, topic, count = 10, resourcesCo
   );
 }
 
-/** Extra instruction so quiz JSON always includes rationale (explanation) per question. */
-const QUIZ_RATIONALE_INSTRUCTION = `
-OUTPUT REQUIREMENT: Your response must be a single valid JSON object with a "questions" array. Every question object MUST include:
-- "question" (string), "options" (array of 4 strings), "correct" (number 0-3), and "rationale" (string).
-- "rationale": a short explanation of why the correct answer is right, based on the material. This is shown to students after they answer. Do not omit it.`;
-
 export async function generateQuizzes(subject, topic, count = 5, resourcesContext = '') {
-  const extraContext = (resourcesContext || '').trim()
-    ? resourcesContext.trim() + QUIZ_RATIONALE_INSTRUCTION
-    : QUIZ_RATIONALE_INSTRUCTION;
-  return generateWithPrompt(
-    'quizzes',
-    { subject, topic, count: String(count) },
-    extraContext
-  );
+  const extra = (resourcesContext || '').trim() ? resourcesContext.trim() : '';
+  return generateWithPrompt('quizzes', { subject, topic, count: String(count) }, extra);
 }
 
 export async function generateTOK(promptText, resourcesContext = '') {
@@ -206,10 +209,6 @@ export async function generateIdeas(subject, resourcesContext = '', options = {}
 /** Biology IA Idea Generator: generates investigation ideas using Biology-specific prompt + CONFIG. */
 export async function generateBiologyIdeas(subjectOrInterest, resourcesContext = '', options = {}) {
   const interest = options.student_topic_interest || (typeof subjectOrInterest === 'string' ? subjectOrInterest : subjectOrInterest?.name) || 'General biology';
-  const systemContent =
-    BIOLOGY_IDEA_GENERATOR_SYSTEM_PROMPT +
-    '\n\n--- Biology IA Idea Generator CONFIG (authoritative; obey all constraints) ---\n' +
-    BIOLOGY_IDEA_CONFIG_JSON;
   const resourcesNote = (resourcesContext || '').trim() ? `\n\nAvailable platform materials for context (use only to inspire scope):\n${resourcesContext.trim()}` : '';
   const userContent =
     `Generate IB Biology IA investigation ideas for a student with the following interest/topic: "${interest}".\n` +
@@ -218,23 +217,11 @@ export async function generateBiologyIdeas(subjectOrInterest, resourcesContext =
     (options.preferred_complexity ? `Preferred complexity: ${options.preferred_complexity}. ` : '') +
     (options.teacher_constraints ? `Teacher constraints: ${options.teacher_constraints}. ` : '') +
     `\nOutput a set of 5 feasible, syllabus-grounded ideas with the structure required by the CONFIG. Use clear headings and bullet points. Do not output raw JSON only. End with "Choose one idea to develop further."${resourcesNote}`;
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.7,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return ideaGenCompletion('biology_idea_generator', userContent, 0.7);
 }
 
 /** Business IA Idea Generator: generates Research Project ideas using Business-specific prompt + CONFIG. */
 export async function generateBusinessIdeas(subjectName, resourcesContext = '', options = {}) {
-  const systemContent =
-    BUSINESS_IDEA_GENERATOR_SYSTEM_PROMPT +
-    '\n\n--- Business IA Idea Generator CONFIG (authoritative; obey all constraints) ---\n' +
-    BUSINESS_IDEA_CONFIG_JSON;
   const resourcesNote = (resourcesContext || '').trim() ? `\n\nAvailable platform materials for context:\n${resourcesContext.trim()}` : '';
   const hasPreferences =
     options.industry ||
@@ -258,24 +245,12 @@ export async function generateBusinessIdeas(subjectName, resourcesContext = '', 
       (options.constraints ? `Constraints/preferences: ${options.constraints}. ` : '') +
       resourcesNote
     : `The student has not yet provided preferences. Output the list of questions from Step 1 (Collect required inputs) so they can respond. Do not generate ideas yet.${resourcesNote}`;
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.7,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return ideaGenCompletion('business_idea_generator', userContent, 0.7);
 }
 
 /** Chemistry IA Idea Generator: generates investigation ideas using Chemistry-specific prompt + CONFIG. */
 export async function generateChemistryIdeas(subjectOrInterest, resourcesContext = '', options = {}) {
   const interest = options.student_topic_interest || (typeof subjectOrInterest === 'string' ? subjectOrInterest : subjectOrInterest?.name) || 'General chemistry';
-  const systemContent =
-    CHEMISTRY_IDEA_GENERATOR_SYSTEM_PROMPT +
-    '\n\n--- Chemistry IA Idea Generator CONFIG (authoritative; obey all constraints) ---\n' +
-    CHEMISTRY_IDEA_CONFIG_JSON;
   const resourcesNote = (resourcesContext || '').trim() ? `\n\nAvailable platform materials for context (use only to inspire scope):\n${resourcesContext.trim()}` : '';
   const userContent =
     `Generate IB Chemistry IA investigation ideas for a student with the following interest/topic: "${interest}".\n` +
@@ -287,23 +262,11 @@ export async function generateChemistryIdeas(subjectOrInterest, resourcesContext
     (options.access_to_colorimeter_or_ph_meter ? `Access to colorimeter or pH meter: ${options.access_to_colorimeter_or_ph_meter}. ` : '') +
     (options.known_available_concentrations_or_stock_solutions ? `Known available concentrations or stock solutions: ${options.known_available_concentrations_or_stock_solutions}. ` : '') +
     `\nOutput a set of 5 feasible, syllabus-grounded ideas with the structure required by the CONFIG. Use clear headings and bullet points. Do not output raw JSON only. End with "Choose one idea to develop further."${resourcesNote}`;
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.7,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return ideaGenCompletion('chemistry_idea_generator', userContent, 0.7);
 }
 
 /** Economics IA Article Checker & Planner: evaluates article suitability, recommends one key concept, brief commentary plan, and diagrams. */
 export async function generateEconomicsArticleCheck(subjectName, resourcesContext = '', options = {}) {
-  const systemContent =
-    ECONOMICS_IDEA_GENERATOR_SYSTEM_PROMPT +
-    '\n\n--- Economics IA Article Checker CONFIG (authoritative; obey all constraints) ---\n' +
-    ECONOMICS_IDEA_CONFIG_JSON;
   const articleText = (options.article_content || '').trim();
   const hasArticle = articleText.length > 0;
   const sourceNote = options.article_source ? `\nSource: ${options.article_source}` : '';
@@ -311,23 +274,11 @@ export async function generateEconomicsArticleCheck(subjectName, resourcesContex
   const userContent = hasArticle
     ? `The student has selected the following article. Perform the article suitability check and provide the key concept recommendation, very brief commentary plan (bullet points), and recommended diagrams (bullet points) using exactly the OUTPUT FORMAT specified. Do not write any commentary text or model paragraphs.\n\n--- Article ---\n\n${articleText}${sourceNote}${dateNote}`
     : `The student has not yet provided an article. Ask them to paste the article text and, if available, the source and publication date, so you can perform the suitability check and commentary plan. Use a neutral, student-facing tone.`;
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return ideaGenCompletion('economics_idea_generator', userContent, 0.4);
 }
 
 /** Global Politics Engagement Project Idea Generator: generates 3–5 engagement project ideas using prompt + CONFIG. */
 export async function generateGlobalPoliticsIdeas(subjectName, resourcesContext = '', options = {}) {
-  const systemContent =
-    GLOBAL_POLITICS_IDEA_GENERATOR_SYSTEM_PROMPT +
-    '\n\n--- Global Politics Engagement Project Idea Generator CONFIG (authoritative; obey all constraints) ---\n' +
-    GLOBAL_POLITICS_IDEA_CONFIG_JSON;
   const resourcesNote = (resourcesContext || '').trim() ? `\n\nAvailable platform materials for context:\n${resourcesContext.trim()}` : '';
   const hasPreferences =
     options.political_issue_interest ||
@@ -349,23 +300,11 @@ export async function generateGlobalPoliticsIdeas(subjectName, resourcesContext 
       (options.constraints ? `Constraints: ${options.constraints}. ` : '') +
       resourcesNote
     : `The student has not yet provided preferences. Output the list of questions from Step 1 (Required student inputs) so they can respond. Do not generate ideas yet.${resourcesNote}`;
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.7,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return ideaGenCompletion('global_politics_idea_generator', userContent, 0.7);
 }
 
 /** Mathematics AA IA Idea Generator: generates 3–5 Exploration ideas using prompt + CONFIG (real-life enforced). */
 export async function generateMathAAIdeas(subjectName, resourcesContext = '', options = {}) {
-  const systemContent =
-    MATH_AA_IDEA_GENERATOR_SYSTEM_PROMPT +
-    '\n\n--- Mathematics AA IA Idea Generator CONFIG (authoritative; obey all constraints) ---\n' +
-    MATH_AA_IDEA_CONFIG_JSON;
   const resourcesNote = (resourcesContext || '').trim() ? `\n\nAvailable platform materials for context:\n${resourcesContext.trim()}` : '';
   const hasPreferences =
     options.real_world_context ||
@@ -382,23 +321,11 @@ export async function generateMathAAIdeas(subjectName, resourcesContext = '', op
       (options.constraints ? `Constraints: ${options.constraints}. ` : '') +
       resourcesNote
     : `The student has not yet provided preferences. Output the list of questions from Step 1 (Ask the student for inputs) so they can respond. Do not generate ideas yet.${resourcesNote}`;
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.7,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return ideaGenCompletion('math_aa_idea_generator', userContent, 0.7);
 }
 
 /** Mathematics AI (Applications and Interpretation) IA Idea Generator: generates 3–5 Exploration ideas using prompt + CONFIG. */
 export async function generateMathAIIdeas(subjectName, resourcesContext = '', options = {}) {
-  const systemContent =
-    MATH_AI_IDEA_GENERATOR_SYSTEM_PROMPT +
-    '\n\n--- Mathematics AI IA Idea Generator CONFIG (authoritative; obey all constraints) ---\n' +
-    MATH_AI_IDEA_CONFIG_JSON;
   const resourcesNote = (resourcesContext || '').trim() ? `\n\nAvailable platform materials for context:\n${resourcesContext.trim()}` : '';
   const hasPreferences =
     options.real_world_context ||
@@ -413,24 +340,12 @@ export async function generateMathAIIdeas(subjectName, resourcesContext = '', op
       (options.constraints ? `Constraints: ${options.constraints}. ` : '') +
       resourcesNote
     : `The student has not yet provided preferences. Output the list of questions from Step 1 (Ask the student for inputs) so they can respond. Do not generate ideas yet.${resourcesNote}`;
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.7,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return ideaGenCompletion('math_ai_idea_generator', userContent, 0.7);
 }
 
 /** Physics IA Idea Generator: generates 5 investigation ideas using Physics-specific prompt + CONFIG (syllabus-grounded, school-lab feasible). */
 export async function generatePhysicsIdeas(subjectOrInterest, resourcesContext = '', options = {}) {
   const interest = options.student_topic_interest || (typeof subjectOrInterest === 'string' ? subjectOrInterest : subjectOrInterest?.name) || 'General physics';
-  const systemContent =
-    PHYSICS_IDEA_GENERATOR_SYSTEM_PROMPT +
-    '\n\n--- Physics IA Idea Generator CONFIG (authoritative; obey all constraints) ---\n' +
-    PHYSICS_IDEA_CONFIG_JSON;
   const resourcesNote = (resourcesContext || '').trim() ? `\n\nAvailable platform materials for context (use only to inspire scope):\n${resourcesContext.trim()}` : '';
   const hasPreferences =
     options.available_resources ||
@@ -457,23 +372,11 @@ export async function generatePhysicsIdeas(subjectOrInterest, resourcesContext =
       (options.preferred_complexity ? `Preferred complexity: ${options.preferred_complexity}. ` : '') +
       `\nOutput a set of 5 feasible, syllabus-grounded ideas with the structure required by the CONFIG (idea_set, safety_summary, equipment_checklist, assumptions_and_unknowns, coverage_checklist). Use clear headings and bullet points. Do not output raw JSON only.${resourcesNote}`
     : `The student has not yet provided the required inputs. Ask only for the missing items from the config (your_topic_interest, available_resources, time_constraints, safety_and_ethics_constraints, and SL or HL). Do not generate ideas yet.${resourcesNote}`;
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.7,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return ideaGenCompletion('physics_idea_generator', userContent, 0.7);
 }
 
 /** Psychology IA Research Proposal Idea Generator: generates 3 research proposal ideas using prompt + CONFIG (real-life, population, ethics). */
 export async function generatePsychologyIdeas(subjectName, resourcesContext = '', options = {}) {
-  const systemContent =
-    PSYCHOLOGY_IDEA_GENERATOR_SYSTEM_PROMPT +
-    '\n\n--- Psychology IA Idea Generator CONFIG (authoritative; obey all constraints) ---\n' +
-    PSYCHOLOGY_IDEA_CONFIG_JSON;
   const resourcesNote = (resourcesContext || '').trim() ? `\n\nAvailable platform materials for context:\n${resourcesContext.trim()}` : '';
   const hasPreferences =
     options.psychological_issues_interest ||
@@ -490,59 +393,36 @@ export async function generatePsychologyIdeas(subjectName, resourcesContext = ''
       (options.constraints ? `Constraints: ${options.constraints}. ` : '') +
       resourcesNote
     : `The student has not yet provided preferences. Output the list of questions from Step 1 (Ask the student for inputs) so they can respond. Do not generate ideas yet.${resourcesNote}`;
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.7,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return ideaGenCompletion('psychology_idea_generator', userContent, 0.7);
 }
 
-/** Returns the system prompt + CONFIG for the Ideas chat for a given subject (same routing as generateIdeas). */
-function getIdeasSystemPrompt(subjectName) {
+async function buildIdeasChatSystemPrompt(subjectName) {
   const name = (subjectName && (typeof subjectName === 'string' ? subjectName : subjectName?.name)) || 'General';
   const lower = name.toLowerCase();
-  const configSuffix = '\n\n--- CONFIG (authoritative; obey all constraints) ---\n';
-  if (lower.includes('biology')) {
-    return BIOLOGY_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + BIOLOGY_IDEA_CONFIG_JSON;
+  let key = null;
+  if (lower.includes('tok essay')) key = 'tok_essay_idea_generator';
+  else if (lower.includes('tok exhibition')) key = 'tok_exhibition_idea_generator';
+  else if (lower.includes('biology')) key = 'biology_idea_generator';
+  else if (lower.includes('business')) key = 'business_idea_generator';
+  else if (lower.includes('chemistry')) key = 'chemistry_idea_generator';
+  else if (lower.includes('economic')) key = 'economics_idea_generator';
+  else if (lower.includes('global') && lower.includes('politic')) key = 'global_politics_idea_generator';
+  else if (lower.includes('physic')) key = 'physics_idea_generator';
+  else if (lower.includes('psycholog')) key = 'psychology_idea_generator';
+  else if (lower.includes('math')) key = isMathAI(name) ? 'math_ai_idea_generator' : 'math_aa_idea_generator';
+
+  if (key) {
+    const pack = await loadActivePrompt(key);
+    if (pack) return buildSystemPrompt(pack);
   }
-  if (lower.includes('business')) {
-    return BUSINESS_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + BUSINESS_IDEA_CONFIG_JSON;
-  }
-  if (lower.includes('chemistry')) {
-    return CHEMISTRY_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + CHEMISTRY_IDEA_CONFIG_JSON;
-  }
-  if (lower.includes('economic')) {
-    return ECONOMICS_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + ECONOMICS_IDEA_CONFIG_JSON;
-  }
-  if (lower.includes('global') && lower.includes('politic')) {
-    return GLOBAL_POLITICS_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + GLOBAL_POLITICS_IDEA_CONFIG_JSON;
-  }
-  if (lower.includes('math')) {
-    if (isMathAI(name)) return MATH_AI_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + MATH_AI_IDEA_CONFIG_JSON;
-    return MATH_AA_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + MATH_AA_IDEA_CONFIG_JSON;
-  }
-  if (lower.includes('physic')) {
-    return PHYSICS_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + PHYSICS_IDEA_CONFIG_JSON;
-  }
-  if (lower.includes('psycholog')) {
-    return PSYCHOLOGY_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + PSYCHOLOGY_IDEA_CONFIG_JSON;
-  }
-  if (lower.includes('tok essay')) {
-    return TOK_ESSAY_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + TOK_ESSAY_IDEA_CONFIG_JSON;
-  }
-  if (lower.includes('tok exhibition')) {
-    return TOK_EXHIBITION_IDEA_GENERATOR_SYSTEM_PROMPT + configSuffix + TOK_EXHIBITION_IDEA_CONFIG_JSON;
-  }
+  const fallback = await loadActivePrompt('idea_generation');
+  if (fallback) return buildSystemPrompt(fallback);
   return `You are an IB tutor helping students generate project and assessment ideas for ${name}. Use the conversation to ask clarifying questions when needed, then suggest structured ideas. Be concise and aligned with IB standards.`;
 }
 
 /** Ideas chat: multi-turn conversation for IA/assessment idea generation (subject-specific system prompt + CONFIG). */
 export async function ideasChat(messages, subjectName, resourcesContext = '') {
-  const systemBase = getIdeasSystemPrompt(subjectName);
+  const systemBase = await buildIdeasChatSystemPrompt(subjectName);
   const resourcesNote = (resourcesContext || '').trim()
     ? `\n\nAvailable platform materials for context (use only to inspire scope):\n${resourcesContext.trim()}`
     : '';
@@ -582,302 +462,64 @@ export async function reviewSubmission(type, content, subject = '') {
   return generateWithPrompt(key, { content, subject: subjectName || 'General' });
 }
 
-/** Biology IA Revision Coach: detailed revision feedback using CONFIG. Used when subject is Biology and type is internal_assessment. */
+/** Biology IA Revision Coach */
 export async function biologyIARevisionFeedback(iaDraftText) {
-  const systemContent =
-    BIOLOGY_IA_REVISION_SYSTEM_PROMPT +
-    '\n\n--- Biology IA CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
-    BIOLOGY_IA_CONFIG_JSON;
-  const userContent =
-    'Review this IB Biology Internal Assessment draft. Provide detailed revision feedback following your instructions. Use only the headings and structure specified.\n\n--- Student\'s draft ---\n\n' +
-    (iaDraftText || '').trim();
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return runRevisionCoach('biology_ia_revision', iaDraftText);
 }
 
-/** Business Management IA Revision Coach: revision feedback using CONFIG. Used when subject is Business (Management) and type is internal_assessment. */
 export async function businessIARevisionFeedback(iaDraftText) {
-  const systemContent =
-    BUSINESS_IA_REVISION_SYSTEM_PROMPT +
-    '\n\n--- Business IA CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
-    BUSINESS_IA_CONFIG_JSON;
-  const userContent =
-    'Review this IB Business Management Internal Assessment draft. Provide revision feedback following your instructions. Use only the headings and structure specified.\n\n--- Student\'s draft ---\n\n' +
-    (iaDraftText || '').trim();
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return runRevisionCoach('business_ia_revision', iaDraftText);
 }
 
-/** Chemistry IA Revision Coach: detailed revision feedback using CONFIG. Used when subject is Chemistry and type is internal_assessment. */
 export async function chemistryIARevisionFeedback(iaDraftText) {
-  const systemContent =
-    CHEMISTRY_IA_REVISION_SYSTEM_PROMPT +
-    '\n\n--- Chemistry IA CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
-    CHEMISTRY_IA_CONFIG_JSON;
-  const userContent =
-    'Review this IB Chemistry Internal Assessment draft. Provide detailed revision feedback following your instructions. Use only the headings and structure specified.\n\n--- Student\'s draft ---\n\n' +
-    (iaDraftText || '').trim();
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return runRevisionCoach('chemistry_ia_revision', iaDraftText);
 }
 
-/** Economics IA Revision Coach: revision feedback for Portfolio of 3 Commentaries using CONFIG. Used when subject is Economics and type is internal_assessment. */
 export async function economicsIARevisionFeedback(iaDraftText) {
-  const systemContent =
-    ECONOMICS_IA_REVISION_SYSTEM_PROMPT +
-    '\n\n--- Economics IA CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
-    ECONOMICS_IA_CONFIG_JSON;
-  const userContent =
-    'Review this IB Economics Internal Assessment commentary (or commentaries). Provide revision feedback following your instructions. Use only the headings and structure specified.\n\n--- Student\'s draft ---\n\n' +
-    (iaDraftText || '').trim();
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return runRevisionCoach('economics_ia_revision', iaDraftText);
 }
 
-/** Global Politics Engagement Project Feedback Agent: revision-only feedback using CONFIG. Used when subject is Global Politics and type is internal_assessment. */
 export async function globalPoliticsIARevisionFeedback(iaDraftText) {
-  const systemContent =
-    GLOBAL_POLITICS_IA_REVISION_SYSTEM_PROMPT +
-    '\n\n--- Global Politics Engagement Project CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
-    GLOBAL_POLITICS_IA_CONFIG_JSON;
-  const userContent =
-    'Review this IB Global Politics Engagement Project draft. Provide diagnostic revision feedback following your instructions. Use only the headings and structure specified. Do not write content for the student.\n\n--- Student\'s draft ---\n\n' +
-    (iaDraftText || '').trim();
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return runRevisionCoach('global_politics_ia_revision', iaDraftText);
 }
 
-/** Math AA (Mathematics: Analysis and Approaches) Exploration IA Revision Coach: revision feedback using CONFIG. Used when subject is Mathematics/Math and type is internal_assessment. */
 export async function mathAAIARevisionFeedback(iaDraftText) {
-  const systemContent =
-    MATH_AA_IA_REVISION_SYSTEM_PROMPT +
-    '\n\n--- Math AA Exploration CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
-    MATH_AA_IA_CONFIG_JSON;
-  const userContent =
-    'Review this IB Mathematics AA (Analysis and Approaches) Exploration draft. Provide revision-focused feedback following your instructions. Do not assign marks or bands. End with a short checklist of high-impact revisions (max 5 items).\n\n--- Student\'s draft ---\n\n' +
-    (iaDraftText || '').trim();
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return runRevisionCoach('math_aa_ia_revision', iaDraftText);
 }
 
-/** Math AI (Mathematics: Applications and Interpretation) Exploration IA Revision Coach: revision feedback using CONFIG. */
 export async function mathAIIARevisionFeedback(iaDraftText) {
-  const systemContent =
-    MATH_AI_IA_REVISION_SYSTEM_PROMPT +
-    '\n\n--- Math AI Exploration CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
-    MATH_AI_IA_CONFIG_JSON;
-  const userContent =
-    'Review this IB Mathematics AI (Applications and Interpretation) Exploration draft. Provide revision-focused feedback following your instructions. Do not assign marks or bands. End with a short checklist of high-impact revisions (max 5 items).\n\n--- Student\'s draft ---\n\n' +
-    (iaDraftText || '').trim();
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return runRevisionCoach('math_ai_ia_revision', iaDraftText);
 }
 
-/** Physics IA Revision Coach: detailed revision feedback using CONFIG. Used when subject is Physics and type is internal_assessment. */
 export async function physicsIARevisionFeedback(iaDraftText) {
-  const systemContent =
-    PHYSICS_IA_REVISION_SYSTEM_PROMPT +
-    '\n\n--- Physics IA CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
-    PHYSICS_IA_CONFIG_JSON;
-  const userContent =
-    'Review this IB Physics Internal Assessment draft. Provide precise revision-focused feedback following your instructions. Use only the headings and structure specified. Do not assign marks or rewrite content.\n\n--- Student\'s draft ---\n\n' +
-    (iaDraftText || '').trim();
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return runRevisionCoach('physics_ia_revision', iaDraftText);
 }
 
-/** Psychology IA (Research Proposal) Feedback Coach: diagnostic criterion-aligned feedback using CONFIG. Used when subject is Psychology and type is internal_assessment. */
 export async function psychologyIARevisionFeedback(iaDraftText) {
-  const systemContent =
-    PSYCHOLOGY_IA_REVISION_SYSTEM_PROMPT +
-    '\n\n--- Psychology IA CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
-    PSYCHOLOGY_IA_CONFIG_JSON;
-  const userContent =
-    'Evaluate this IB Psychology IA research proposal draft. Provide diagnostic, criterion-aligned feedback using only the headings and structure specified. Do not assign marks or rewrite the proposal.\n\n--- Student\'s draft ---\n\n' +
-    (iaDraftText || '').trim();
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return runRevisionCoach('psychology_ia_revision', iaDraftText);
 }
 
-/** TOK Essay Feedback Coach: diagnostic feedback using CONFIG. Used when subject is TOK Essay and type is external_assessment. */
 export async function tokEssayFeedback(essayText) {
-  const systemContent =
-    TOK_ESSAY_IA_REVISION_SYSTEM_PROMPT +
-    '\n\n--- TOK Essay CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
-    TOK_ESSAY_IA_CONFIG_JSON;
-  const userContent =
-    'Review this TOK Essay draft. Provide diagnostic feedback following your instructions. Use only the headings and structure specified (Overall Alignment, Strengths vs Limitations table, Targeted Revision Guidance). Do not assign marks or rewrite paragraphs.\n\n--- Student\'s draft ---\n\n' +
-    (essayText || '').trim();
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return runRevisionCoach('tok_essay_ia_revision', essayText);
 }
 
-/** TOK Exhibition Feedback Coach: revision feedback using CONFIG. Used when subject is TOK Exhibition and type is internal_assessment. */
 export async function tokExhibitionIARevisionFeedback(exhibitionText) {
-  const systemContent =
-    TOK_EXHIBITION_IA_REVISION_SYSTEM_PROMPT +
-    '\n\n--- TOK Exhibition CONFIG (internal use only; do not mention CONFIG in your response) ---\n' +
-    TOK_EXHIBITION_IA_CONFIG_JSON;
-  const userContent =
-    'Review this TOK Exhibition draft. Provide revision feedback following your instructions. Use only the structure specified (Critical issues, Object-by-object feedback, TOK thinking overview, Strengths vs limitations table, Revision checklist). Do not assign marks or rewrite commentary.\n\n--- Student\'s draft ---\n\n' +
-    (exhibitionText || '').trim();
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: systemContent },
-      { role: 'user', content: userContent },
-    ],
-    temperature: 0.4,
-  });
-  return completion.choices?.[0]?.message?.content ?? '';
+  return runRevisionCoach('tok_exhibition_ia_revision', exhibitionText);
 }
 
 export async function generateQuizReportTips(summary) {
   return generateWithPrompt('quiz_report_tips', { summary: summary || 'No attempt data.' });
 }
 
-const STUDY_LEARN_SYSTEM_PROMPT = `You are Study & Learn — IB Tutor.
-You teach using ONLY the uploaded materials provided in the "Knowledge" section below.
-
-SCOPE RULE (MANDATORY — READ FIRST)
-The Knowledge section below contains the ONLY content you may use. Students often ask using different words than the exact headings in the materials (e.g. "gene expression" vs "D2.2 Gene expression (HL)" or "expression of genes"). You MUST treat these as the same topic and answer from the materials.
-
-When the student asks a question:
-1. Identify the concept they are asking about (e.g. gene expression, transcription, translation, enzymes, water properties).
-2. Search the ENTIRE Knowledge section for that concept, including: the exact phrase, synonyms, related terms, and section headings (e.g. "Gene expression", "expression of genes", "transcription", "translation"). Look in every file/section listed in the Knowledge block.
-3. If you find ANY relevant content (same concept under any wording or heading), you MUST answer using that content. Do NOT refuse. Do NOT say the topic is outside scope.
-4. Only if you have searched the full Knowledge section and found nothing related to the student's question, say: "This topic isn't covered in your current materials for this subject."
-
-Examples: If the student asks about "gene expression" and the materials include a section on gene expression (e.g. "D2.2 Gene expression (HL)" or content about transcription/translation), you MUST answer. If they ask about "how enzymes work" and the materials discuss enzymes, answer from that. Never refuse because the student's wording does not match the heading word-for-word.
-
-────────────────────────
-INTERACTION LOGIC — ADAPTIVE PHASE SYSTEM
-────────────────────────
-
-There are four phases:
-1) DIAGNOSE → 2) HINT → 3) CHECK → 4) REVEAL / SUMMARY
-
-The GPT must never skip or merge these phases without reason.
-Progression depends on how well the student responds.
-
-DIAGNOSE PHASE
-Goal: Assess what the student already knows.
-Ask 1–3 short diagnostic questions, depending on concept complexity.
-Wait for the student's response.
-If the student answers well → acknowledge briefly and move to CHECK or directly to REVEAL / SUMMARY if they clearly understand.
-If the student struggles → move to HINT, then re-ask the diagnostic question(s).
-Forbidden: Explanations, examples, or exam tips.
-
-HINT PHASE
-Goal: Nudge the student toward understanding.
-Give 1–2 short hints (simple, conceptual, not answers).
-If the concept is complex or abstract, you may include a short analogy (1–2 sentences, clearly labeled "Analogy:").
-Re-ask the diagnostic question afterward so the student can apply the hint.
-Forbidden: Full explanations or summaries.
-
-CHECK PHASE
-Goal: Verify understanding.
-Ask 1–2 short check questions.
-If correct → proceed to REVEAL / SUMMARY.
-If incorrect → offer another short hint or re-ask as needed.
-Forbidden: New explanations, content, or sources.
-
-REVEAL / SUMMARY PHASE
-Goal: Deliver the full, clear IB-style explanation.
-Provide a complete and accurate IB explanation or summary.
-Include exam tips when useful.
-If the concept is hard, use a brief analogy (labeled "Analogy:") to simplify it.
-If a diagram or visual would make the concept clearer, you may generate or attach a simple, labeled illustration.
-Images should be informative, not decorative — only use them if they directly help explain the concept.
-Use clean, clear visuals (atomic models, reaction schemes, molecular shapes).
-Always explain the image briefly in words ("This diagram shows how…").
-End with:
-Sources used: <IB subtopic codes>
-
-STYLE RULES
-Speak simply, like a calm, supportive teacher.
-Encourage thinking ("What do you think happens next?").
-Friendly, confident, and natural — not robotic.
-Use analogies only when they genuinely help understanding.
-Never invent or extend beyond uploaded IB materials.
-Cite subtopics in REVEAL phase only.`;
-
 /** Study & Learn chat: conversation with IB Tutor using subject materials as Knowledge. */
 export async function studyLearnChat(messages, knowledgeText, subjectName = '') {
+  const pack = await loadActivePrompt('study_learn');
+  if (!pack) throw new Error('Study & Learn prompt is not configured.');
   const knowledge = (knowledgeText || '').trim()
     ? `\n\nKnowledge (uploaded materials — use only this to answer):\n${knowledgeText.trim()}`
     : '\n\nNo uploaded materials for this subject. If the student asks about specific content, respond: "There are no materials for this subject yet, so I can\'t answer from your course content."';
-  const systemContent = STUDY_LEARN_SYSTEM_PROMPT.replace(/\{\}/g, subjectName || '') + knowledge;
+  const base = buildSystemPrompt(pack);
+  const systemContent = fillTemplate(base, { subjectName: subjectName || '' }) + knowledge;
   const apiMessages = [
     { role: 'system', content: systemContent },
     ...messages.map((m) => ({ role: m.role, content: String(m.content || '').trim() })).filter((m) => m.content),
@@ -892,7 +534,9 @@ export async function studyLearnChat(messages, knowledgeText, subjectName = '') 
 
 /** Feynman Class Agent: student teaches the AI; AI asks questions, then gives diagnostic evaluation (no grades). */
 export async function feynmanChat(messages, subjectName = '', resourcesContext = '') {
-  const systemContent = fillTemplate(FEYNMAN_AGENT_SYSTEM_PROMPT, { subjectName: subjectName || 'this subject' });
+  const pack = await loadActivePrompt('feynman_agent');
+  if (!pack) throw new Error('Feynman agent prompt is not configured.');
+  const systemContent = fillTemplate(buildSystemPrompt(pack), { subjectName: subjectName || 'this subject' });
   const extra = (resourcesContext || '').trim()
     ? `\n\nOptional reference — topics available in Study & Learn for this subject (use when suggesting where to study):\n${resourcesContext.trim()}`
     : '';
