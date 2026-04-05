@@ -36,7 +36,7 @@ function getSubjectIconUrl(subject) {
   return { local: `/subject-icons/${entry.key}.png`, cdn: `${FLATICON_CDN}/${sub}/${entry.flaticonId}.png` };
 }
 
-/** Landing page for Note taking: list subjects with same design as Materials. */
+/** Landing page for Note-taking: list subjects with same design as Materials. */
 export function NotesLanding() {
   const { user } = useAuth();
   const [subjects, setSubjects] = useState([]);

@@ -576,7 +576,7 @@ export function AITools() {
                           ))}
                       </select>
                       {form.sourceType === 'my_materials' && myMaterialResourcesBySubject.length === 0 && (
-                        <p className="text-sm text-examia-mid mt-1">No uploads for this subject. Upload in <Link to="/resources" className="underline">My resources</Link> first.</p>
+                        <p className="text-sm text-examia-mid mt-1">No uploads for this subject. Upload in <Link to="/resources" className="underline">Library</Link> first.</p>
                       )}
                       {form.sourceType === 'platform_materials' && materialFilesBySubject.length === 0 && (
                         <p className="text-sm text-examia-mid mt-1">No platform materials for this subject. Ask Super Admin to add files to the materials folder.</p>
@@ -724,7 +724,7 @@ export function AITools() {
                     {saving ? 'Saving…' : 'Save'}
                   </button>
                 </div>
-                {saved && <p className="text-sm text-examia-dark">Saved. Go to <Link to="/resources" className="font-medium underline">My resources</Link> to publish it for students.</p>}
+                {saved && <p className="text-sm text-examia-dark">Saved. Go to <Link to="/resources" className="font-medium underline">Library</Link> to publish it for students.</p>}
               </form>
             )}
           </motion.div>

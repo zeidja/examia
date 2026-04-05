@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
@@ -56,6 +56,26 @@ export function MyContent() {
     }
   }, [isStudent]);
 
+  /** One Modules card for TOK (essay + exhibition are still separate subjects in the API). */
+  const studentDisplaySubjects = useMemo(() => {
+    const list = subjects || [];
+    const essay = list.find((s) => s.name === 'TOK Essay');
+    const exhibition = list.find((s) => s.name === 'TOK Exhibition');
+    const rest = list.filter((s) => s.name !== 'TOK Essay' && s.name !== 'TOK Exhibition');
+    const merged = [];
+    if (essay || exhibition) {
+      const primary = essay || exhibition;
+      merged.push({
+        ...primary,
+        name: 'TOK',
+        code: 'TOK',
+      });
+    }
+    const combined = [...rest, ...merged];
+    combined.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+    return combined;
+  }, [subjects]);
+
   const handleIconError = (subjectId) => {
     setIconErrors((prev) => new Set(prev).add(subjectId));
   };
@@ -86,7 +106,7 @@ export function MyContent() {
           <p className="text-examia-mid mt-2 text-sm">Choose a subject to view fundamentals, quizzes, flashcards, get ideas, and submit work for AI feedback.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {subjects.map((s) => {
+          {studentDisplaySubjects.map((s) => {
             const cardStyle = getSubjectCardStyle(s);
             const iconUrls = getSubjectIconUrl(s);
             const showIcon = iconUrls && !iconErrors.has(s._id);
@@ -127,7 +147,7 @@ export function MyContent() {
             );
           })}
         </div>
-        {subjects.length === 0 && (
+        {studentDisplaySubjects.length === 0 && (
           <div className="rounded-2xl border-2 border-dashed border-examia-soft/40 bg-examia-soft/5 p-12 text-center">
             <div className="w-14 h-14 rounded-2xl bg-examia-soft/20 flex items-center justify-center mx-auto mb-4 text-examia-mid">
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
@@ -164,7 +184,7 @@ export function MyContent() {
             to="/resources"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-examia-dark text-white font-medium hover:bg-examia-mid transition shadow-sm shrink-0"
           >
-            Create & manage in Resources
+            Create & manage in Library
           </Link>
         )}
       </div>
@@ -211,10 +231,10 @@ export function MyContent() {
         <div className="rounded-2xl border-2 border-dashed border-examia-soft/40 bg-examia-soft/5 p-12 text-center">
           <p className="font-semibold text-examia-dark">No content yet</p>
           <p className="text-examia-mid text-sm mt-1">
-            {isTeacher ? 'Create quizzes and flashcards in AI Tools, then publish them from Resources.' : 'Quizzes and materials will appear here when teachers publish them.'}
+            {isTeacher ? 'Create quizzes and flashcards in AI Tools, then publish them from Library.' : 'Quizzes and materials will appear here when teachers publish them.'}
           </p>
           {isTeacher && (
-            <Link to="/resources" className="inline-block mt-4 text-sm font-medium text-examia-mid hover:text-examia-dark transition">Go to Resources →</Link>
+            <Link to="/resources" className="inline-block mt-4 text-sm font-medium text-examia-mid hover:text-examia-dark transition">Go to Library →</Link>
           )}
         </div>
       )}

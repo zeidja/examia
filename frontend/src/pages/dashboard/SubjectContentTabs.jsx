@@ -155,7 +155,7 @@ const FUNDAMENTALS_COMING_SOON = [
   },
   {
     path: 'checklists',
-    title: 'Check Lists',
+    title: 'Checklists',
     description: 'Structured checklists for your work',
     icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
     live: true,
@@ -1115,7 +1115,7 @@ export function SubjectDefinitions() {
   );
 }
 
-/** Static “Coming Soon” page for features like Definitions, Command Terms, Check Lists. */
+/** Static “Coming Soon” page for features like Definitions, Command Terms, Checklists. */
 export function SubjectChecklists() {
   const { subjectId } = useParams();
   const [files, setFiles] = useState([]);
@@ -1185,7 +1185,7 @@ export function SubjectChecklists() {
 
   return (
     <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-      <h2 className="text-lg font-semibold text-examia-dark mb-3">Check Lists</h2>
+      <h2 className="text-lg font-semibold text-examia-dark mb-3">Checklists</h2>
       {loading && <p className="text-examia-mid text-sm">Loading…</p>}
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {!loading && !error && files.length === 0 && (

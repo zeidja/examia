@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { QuizFullscreenContext } from '../context/QuizFullscreenContext';
 import api from '../api/axios';
+import { Swal } from '../utils/swal';
 
 import logoImg from '../../assets/logo.png';
 
@@ -76,7 +77,33 @@ const NavIcons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
     </svg>
   ),
+  guide: (
+    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+    </svg>
+  ),
+  questionBank: (
+    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  library: (
+    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6v12a1.5 1.5 0 01-1.5 1.5H4.5A1.5 1.5 0 013 21V9z" />
+    </svg>
+  ),
 };
+
+function fireComingSoonNavAlert(onNavigate, featureLabel) {
+  onNavigate?.();
+  Swal.fire({
+    icon: 'info',
+    title: 'Coming soon',
+    text: `${featureLabel} is not available yet. Check back soon.`,
+    confirmButtonText: 'OK',
+    confirmButtonColor: '#27374D',
+  });
+}
 
 const flatNavIcons = {
   'Home': 'home',
@@ -90,7 +117,7 @@ const flatNavIcons = {
   'Flashcards': 'cards',
   'Quizzes': 'clipboard',
   'Resources': 'folder',
-  'My resources': 'folder',
+  'Library': 'library',
 };
 
 const superAdminNav = [
@@ -116,7 +143,7 @@ const teacherNav = [
   { to: '/classes', label: 'Classes' },
   { to: '/ai/flash-cards', label: 'Flashcards' },
   { to: '/ai/quizzes', label: 'Quizzes' },
-  { to: '/resources', label: 'My resources' },
+  { to: '/resources', label: 'Library' },
 ];
 
 /** Student nav: main links + optional subject section with icons and grouping */
@@ -128,15 +155,21 @@ const studentNavMain = [
 /** Tabs shown before the Internal Assessment dropdown (under Flashcards). */
 const studentSubjectTabsBeforeIA = [
   { toPath: 'materials', label: 'Fundamentals', icon: 'book' },
-  { toPath: 'notes', label: 'Notes', icon: 'notes' },
+  { toPath: 'notes', label: 'Note-taking', icon: 'notes' },
   { toPath: 'quizzes', label: 'Quizzes', icon: 'clipboard' },
   { toPath: 'flash-cards', label: 'Flashcards', icon: 'cards' },
 ];
 
-/** Only Feedback Generator and Idea Generation live inside the Internal Assessment dropdown. */
+/** Feedback Generator, Idea Generation, and placeholder items inside the Internal Assessment dropdown. */
 const studentSubjectTabsInternalAssessment = [
   { toPath: 'feedback', label: 'Feedback Generator', icon: 'fileCheck' },
   { toPath: 'ideas', label: 'Idea Generation', icon: 'lightbulb' },
+  {
+    id: 'ia-guide',
+    label: 'IA Guied',
+    icon: 'guide',
+    comingSoon: true,
+  },
 ];
 
 /** Tabs shown after the Internal Assessment dropdown. */
@@ -144,18 +177,77 @@ const studentSubjectTabsAfterIA = [
   { toPath: 'insights', label: 'Insights', icon: 'insights' },
   { toPath: 'study-and-learn', label: 'Study Lab', icon: 'chat' },
   { toPath: 'feynman', label: 'Teach & Learn', icon: 'feynman' },
+  {
+    id: 'question-bank',
+    label: 'Question bank',
+    icon: 'questionBank',
+    comingSoon: true,
+  },
 ];
 
 const iaOnlySubjectTabs = [
   { toPath: 'feedback', label: 'Feedback Generator', icon: 'fileCheck' },
   { toPath: 'ideas', label: 'Idea Generation', icon: 'lightbulb' },
+  {
+    id: 'ia-guide',
+    label: 'IA Guied',
+    icon: 'guide',
+    comingSoon: true,
+  },
 ];
 
-function getStudentSubjectNav(subjectId, subject) {
+function isPathUnderSubject(pathname, sid) {
+  const p = `/content/subject/${sid}`;
+  return pathname === p || pathname.startsWith(`${p}/`);
+}
+
+function mapIaTabsForSubjectId(subjectId) {
+  const base = `/content/subject/${subjectId}`;
+  return iaOnlySubjectTabs.map((t) =>
+    t.comingSoon ? { ...t, to: undefined, end: false } : { ...t, to: `${base}/${t.toPath}`, end: false }
+  );
+}
+
+function getStudentSubjectNav(subjectId, subject, tokPairIds) {
   if (!subjectId) return { main: studentNavMain, subjectId: null };
   const base = `/content/subject/${subjectId}`;
   const iaOnly = subject?.iaOnly === true;
-  const mapTab = (t) => ({ ...t, to: `${base}/${t.toPath}`, end: false });
+  const tokUnified =
+    iaOnly &&
+    tokPairIds?.essayId &&
+    tokPairIds?.exhibitionId &&
+    (subject?.name === 'TOK Essay' || subject?.name === 'TOK Exhibition');
+
+  if (tokUnified) {
+    return {
+      main: studentNavMain,
+      subjectId,
+      subjectBase: base,
+      subjectTabsBeforeIA: [],
+      subjectTabsAfterIA: [],
+      subjectTabsInternalAssessment: [],
+      tokUnifiedSidebar: {
+        sectionTitle: 'Theory of Knowledge',
+        branches: [
+          {
+            key: 'tok-essay',
+            label: 'TOK Essay',
+            subjectId: tokPairIds.essayId,
+            iaTabs: mapIaTabsForSubjectId(tokPairIds.essayId),
+          },
+          {
+            key: 'tok-exhibition',
+            label: 'TOK Exhibition',
+            subjectId: tokPairIds.exhibitionId,
+            iaTabs: mapIaTabsForSubjectId(tokPairIds.exhibitionId),
+          },
+        ],
+      },
+    };
+  }
+
+  const mapTab = (t) =>
+    t.comingSoon ? { ...t, to: undefined, end: false } : { ...t, to: `${base}/${t.toPath}`, end: false };
   const tabsBeforeIA = iaOnly ? [] : studentSubjectTabsBeforeIA.map(mapTab);
   const tabsAfterIA = iaOnly ? [] : studentSubjectTabsAfterIA.map(mapTab);
   const iaTabsSource = iaOnly ? iaOnlySubjectTabs : studentSubjectTabsInternalAssessment;
@@ -167,25 +259,184 @@ function getStudentSubjectNav(subjectId, subject) {
     subjectTabsBeforeIA: tabsBeforeIA,
     subjectTabsAfterIA: tabsAfterIA,
     subjectTabsInternalAssessment: iaTabs,
+    tokUnifiedSidebar: null,
   };
 }
 
-function getNav(role, location, subjectMeta) {
+function getNav(role, location, subjectMeta, tokPairIds) {
   if (role === 'super_admin') return { type: 'flat', items: superAdminNav };
   if (role === 'school_admin') return { type: 'flat', items: schoolAdminNav };
   if (role === 'teacher') return { type: 'flat', items: teacherNav };
   if (role === 'student') {
     const match = location?.pathname?.match(/^\/content\/subject\/([^/]+)/);
     const subjectId = match ? match[1] : null;
-    return { type: 'student', ...getStudentSubjectNav(subjectId, subjectMeta) };
+    return { type: 'student', ...getStudentSubjectNav(subjectId, subjectMeta, tokPairIds) };
   }
   return { type: 'flat', items: studentNavMain };
 }
 
+/** Nested TOK Essay / TOK Exhibition → Internal Assessment → IA tools (UI only; links use existing subject routes). */
+function TokUnifiedSidebarNav({ branches, pathname, onNavigate, NavIcons, NavLink }) {
+  const branchActive = (b) => isPathUnderSubject(pathname, b.subjectId);
+  const iaActiveForBranch = (b) =>
+    b.iaTabs.some((t) => t.to && (pathname === t.to || pathname.startsWith(`${t.to}/`)));
+
+  const [branchOpen, setBranchOpen] = useState(() => {
+    const o = {};
+    branches.forEach((b) => {
+      o[b.key] = branchActive(b);
+    });
+    return o;
+  });
+  const [iaOpen, setIaOpen] = useState(() => {
+    const o = {};
+    branches.forEach((b) => {
+      o[b.key] = branchActive(b) && iaActiveForBranch(b);
+    });
+    return o;
+  });
+
+  const branchesKey = branches.map((b) => b.subjectId).join(',');
+
+  useEffect(() => {
+    setBranchOpen((prev) => {
+      const next = { ...prev };
+      branches.forEach((b) => {
+        if (isPathUnderSubject(pathname, b.subjectId)) next[b.key] = true;
+      });
+      return next;
+    });
+    setIaOpen((prev) => {
+      const next = { ...prev };
+      branches.forEach((b) => {
+        if (isPathUnderSubject(pathname, b.subjectId) && iaActiveForBranch(b)) next[b.key] = true;
+      });
+      return next;
+    });
+  }, [pathname, branchesKey]);
+
+  const chevronClass = (expanded) =>
+    `w-4 h-4 ml-auto shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`;
+
+  return (
+    <div className="pt-0.5 space-y-0.5">
+      {branches.map((b) => {
+        const bActive = branchActive(b);
+        const bOpen = branchOpen[b.key] ?? bActive;
+        const iaExpanded = iaOpen[b.key] ?? (bActive && iaActiveForBranch(b));
+        const iaRowActive = bActive && iaActiveForBranch(b);
+
+        return (
+          <div key={b.key} className="space-y-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !bOpen;
+                setBranchOpen((o) => ({ ...o, [b.key]: next }));
+                if (next) setIaOpen((o) => ({ ...o, [b.key]: true }));
+              }}
+              className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[15px] transition-all duration-200 text-left ${
+                bActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              {NavIcons.book}
+              <span>{b.label}</span>
+              <svg className={chevronClass(bOpen)} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <AnimatePresence initial={false}>
+              {bOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="pl-2 pr-0 py-0.5 space-y-0.5 border-l border-white/10 ml-3">
+                    <button
+                      type="button"
+                      onClick={() => setIaOpen((o) => ({ ...o, [b.key]: !iaExpanded }))}
+                      className={`flex items-center gap-2 w-full px-2 py-2 rounded-lg text-[14px] transition-all duration-200 text-left ${
+                        iaRowActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {NavIcons.fileCheck}
+                      <span>Internal Assessment</span>
+                      <svg className={chevronClass(iaExpanded)} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <AnimatePresence initial={false}>
+                      {iaExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pl-4 pr-1 py-0.5 space-y-0.5">
+                            {b.iaTabs.map((item) =>
+                              item.comingSoon ? (
+                                <button
+                                  key={`${b.key}-${item.id || item.label}`}
+                                  type="button"
+                                  className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[14px] text-left transition-all duration-200 text-examia-soft hover:bg-white/10 hover:text-white"
+                                  onClick={() => fireComingSoonNavAlert(onNavigate, item.label)}
+                                >
+                                  {item.icon && NavIcons[item.icon]}
+                                  <span>{item.label}</span>
+                                </button>
+                              ) : (
+                                <NavLink
+                                  key={`${b.key}-${item.to}`}
+                                  to={item.to}
+                                  end={false}
+                                  className={({ isActive }) =>
+                                    `flex items-center gap-2 px-3 py-2 rounded-lg text-[14px] transition-all duration-200 ${
+                                      isActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
+                                    }`
+                                  }
+                                  onClick={() => onNavigate(item.to)}
+                                >
+                                  {item.icon && NavIcons[item.icon]}
+                                  <span>{item.label}</span>
+                                </NavLink>
+                              )
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Student sidebar: Back (one step), tabs before IA, Internal Assessment dropdown, tabs after IA. */
-function StudentSubjectNav({ subjectTabsBeforeIA, subjectTabsAfterIA, subjectTabsInternalAssessment, onNavigate, onBack, location, NavIcons, NavLink }) {
+function StudentSubjectNav({
+  subjectTabsBeforeIA,
+  subjectTabsAfterIA,
+  subjectTabsInternalAssessment,
+  tokUnifiedSidebar,
+  onNavigate,
+  onBack,
+  location,
+  NavIcons,
+  NavLink,
+}) {
   const pathname = location?.pathname || '';
-  const isInternalAssessmentActive = subjectTabsInternalAssessment?.some((t) => pathname === t.to || pathname.startsWith(t.to + '/'));
+  const isInternalAssessmentActive = subjectTabsInternalAssessment?.some(
+    (t) => t.to && (pathname === t.to || pathname.startsWith(`${t.to}/`))
+  );
   const [internalAssessmentOpen, setInternalAssessmentOpen] = useState(isInternalAssessmentActive);
   useEffect(() => {
     if (isInternalAssessmentActive) setInternalAssessmentOpen(true);
@@ -201,7 +452,7 @@ function StudentSubjectNav({ subjectTabsBeforeIA, subjectTabsAfterIA, subjectTab
   return (
     <div className="space-y-0.5 mt-6">
       <span className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-examia-soft/70">
-        In this subject
+        {tokUnifiedSidebar?.sectionTitle || 'In this subject'}
       </span>
       <button
         type="button"
@@ -217,63 +468,97 @@ function StudentSubjectNav({ subjectTabsBeforeIA, subjectTabsAfterIA, subjectTab
           <span>{item.label}</span>
         </NavLink>
       ))}
-      <div className="pt-0.5">
-        <button
-          type="button"
-          onClick={() => setInternalAssessmentOpen((o) => !o)}
-          className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[15px] transition-all duration-200 text-left ${
-            isInternalAssessmentActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
-          }`}
-        >
-          {NavIcons.fileCheck}
-          <span>Internal Assessment</span>
-          <svg
-            className={`w-4 h-4 ml-auto shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden
+      {tokUnifiedSidebar?.branches?.length > 0 ? (
+        <TokUnifiedSidebarNav
+          branches={tokUnifiedSidebar.branches}
+          pathname={pathname}
+          onNavigate={onNavigate}
+          NavIcons={NavIcons}
+          NavLink={NavLink}
+        />
+      ) : (
+        <div className="pt-0.5">
+          <button
+            type="button"
+            onClick={() => setInternalAssessmentOpen((o) => !o)}
+            className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[15px] transition-all duration-200 text-left ${
+              isInternalAssessmentActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
+            }`}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        <AnimatePresence initial={false}>
-          {isOpen && subjectTabsInternalAssessment?.length > 0 && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
+            {NavIcons.fileCheck}
+            <span>Internal Assessment</span>
+            <svg
+              className={`w-4 h-4 ml-auto shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden
             >
-              <div className="pl-8 pr-2 py-1 space-y-0.5">
-                {subjectTabsInternalAssessment.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={false}
-                    className={({ isActive }) =>
-                      `flex items-center gap-2 px-3 py-2 rounded-lg text-[14px] transition-all duration-200 ${
-                        isActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
-                      }`
-                    }
-                    onClick={() => onNavigate(item.to)}
-                  >
-                    {item.icon && NavIcons[item.icon]}
-                    <span>{item.label}</span>
-                  </NavLink>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-      {subjectTabsAfterIA?.map((item) => (
-        <NavLink key={item.to} to={item.to} end={false} className={navItemClass} onClick={() => onNavigate(item.to)}>
-          {item.icon && NavIcons[item.icon]}
-          <span>{item.label}</span>
-        </NavLink>
-      ))}
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <AnimatePresence initial={false}>
+            {isOpen && subjectTabsInternalAssessment?.length > 0 && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="pl-8 pr-2 py-1 space-y-0.5">
+                  {subjectTabsInternalAssessment.map((item) =>
+                    item.comingSoon ? (
+                      <button
+                        key={item.id || item.label}
+                        type="button"
+                        className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-[14px] text-left transition-all duration-200 text-examia-soft hover:bg-white/10 hover:text-white"
+                        onClick={() => fireComingSoonNavAlert(onNavigate, item.label)}
+                      >
+                        {item.icon && NavIcons[item.icon]}
+                        <span>{item.label}</span>
+                      </button>
+                    ) : (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        end={false}
+                        className={({ isActive }) =>
+                          `flex items-center gap-2 px-3 py-2 rounded-lg text-[14px] transition-all duration-200 ${
+                            isActive ? 'bg-white/15 text-white font-medium' : 'text-examia-soft hover:bg-white/10 hover:text-white'
+                          }`
+                        }
+                        onClick={() => onNavigate(item.to)}
+                      >
+                        {item.icon && NavIcons[item.icon]}
+                        <span>{item.label}</span>
+                      </NavLink>
+                    )
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+      {subjectTabsAfterIA?.map((item) =>
+        item.comingSoon ? (
+          <button
+            key={item.id || item.label}
+            type="button"
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[15px] text-left transition-all duration-200 text-examia-soft hover:bg-white/10 hover:text-white"
+            onClick={() => fireComingSoonNavAlert(onNavigate, item.label)}
+          >
+            {item.icon && NavIcons[item.icon]}
+            <span>{item.label}</span>
+          </button>
+        ) : (
+          <NavLink key={item.to} to={item.to} end={false} className={navItemClass} onClick={() => onNavigate(item.to)}>
+            {item.icon && NavIcons[item.icon]}
+            <span>{item.label}</span>
+          </NavLink>
+        )
+      )}
     </div>
   );
 }
@@ -303,9 +588,41 @@ export function DashboardLayout() {
     return () => { cancelled = true; };
   }, [user?.role, subjectIdFromPath]);
 
+  const [tokPairIds, setTokPairIds] = useState({ essayId: null, exhibitionId: null });
+  useEffect(() => {
+    if (user?.role !== 'student' || !subjectMeta?.iaOnly) {
+      setTokPairIds({ essayId: null, exhibitionId: null });
+      return;
+    }
+    const n = subjectMeta.name || '';
+    if (n !== 'TOK Essay' && n !== 'TOK Exhibition') {
+      setTokPairIds({ essayId: null, exhibitionId: null });
+      return;
+    }
+    let cancelled = false;
+    api
+      .get('/subjects')
+      .then((r) => {
+        if (cancelled) return;
+        const list = r.data.subjects || [];
+        const essay = list.find((s) => s.name === 'TOK Essay');
+        const exh = list.find((s) => s.name === 'TOK Exhibition');
+        setTokPairIds({
+          essayId: essay?._id != null ? String(essay._id) : null,
+          exhibitionId: exh?._id != null ? String(exh._id) : null,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setTokPairIds({ essayId: null, exhibitionId: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.role, subjectMeta?.iaOnly, subjectMeta?.name]);
+
   const nav = useMemo(
-    () => getNav(user?.role || 'student', location, subjectMeta),
-    [user?.role, location.pathname, subjectMeta]
+    () => getNav(user?.role || 'student', location, subjectMeta, tokPairIds),
+    [user?.role, location.pathname, subjectMeta, tokPairIds]
   );
 
   useEffect(() => {
@@ -373,6 +690,7 @@ export function DashboardLayout() {
                   subjectTabsBeforeIA={nav.subjectTabsBeforeIA}
                   subjectTabsAfterIA={nav.subjectTabsAfterIA}
                   subjectTabsInternalAssessment={nav.subjectTabsInternalAssessment}
+                  tokUnifiedSidebar={nav.tokUnifiedSidebar}
                   onNavigate={(toPath) => {
                     if (subjectIdFromPath && toPath && (toPath === `/content/subject/${subjectIdFromPath}` || toPath.startsWith(`/content/subject/${subjectIdFromPath}/`))) return;
                     setSidebarOpen(false);

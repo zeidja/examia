@@ -157,7 +157,7 @@ export function TeacherResources() {
     >
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-examia-dark">Resources</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-examia-dark">{me?.role === 'teacher' ? 'Library' : 'Resources'}</h1>
           <p className="text-examia-mid mt-1 text-sm">
             {me?.role === 'teacher' ? 'Create and publish quizzes, flashcards, and materials. Students see published items in Modules.' : 'Manage and publish resources for your school.'}
           </p>

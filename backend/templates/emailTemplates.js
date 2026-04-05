@@ -79,7 +79,7 @@ function baseLayout(title, content) {
         ${content}
       </div>
       <div style="${FOOTER_STYLES}">
-        © ${new Date().getFullYear()} Examia · IB E-Learning Platform
+        © ${new Date().getFullYear()} Examia · The IB Mastery System
       </div>
     </div>
   </div>

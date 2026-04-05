@@ -103,7 +103,7 @@ export function Dashboard() {
       {user?.role === 'teacher' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
           {[
-            { label: 'My resources', value: teacherStats.resources },
+            { label: 'Library', value: teacherStats.resources },
             { label: 'Classes', value: teacherStats.classes },
           ].map((item, i) => (
             <motion.div
@@ -160,7 +160,7 @@ export function Dashboard() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-examia-soft/40 text-examia-dark font-medium hover:bg-examia-soft/15 hover:border-examia-soft/50 transition"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                Note taking
+                Note-taking
               </Link>
               <Link
                 to="/content/flashcards"
@@ -302,7 +302,7 @@ export function Dashboard() {
                   to="/resources"
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-examia-soft/40 text-examia-dark font-medium hover:bg-examia-soft/15 hover:border-examia-soft/50 transition"
                 >
-                  My resources
+                  Library
                 </Link>
               </>
             )}

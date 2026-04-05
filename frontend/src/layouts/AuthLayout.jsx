@@ -17,10 +17,10 @@ export function AuthLayout() {
         </div>
         <div className="max-w-md">
           <h1 className="text-3xl xl:text-4xl font-bold text-white tracking-tight leading-tight mb-5">
-            IB E-Learning Platform
+            The IB Mastery System
           </h1>
           <p className="text-examia-soft text-base xl:text-lg leading-relaxed">
-            Flashcards, quizzes, TOK, and assessments powered by AI — built for IB schools.
+            Built for IB students to master, and teachers to lead.
           </p>
         </div>
         <p className="text-examia-soft/70 text-sm">© Examia. For schools using the IB system.</p>
