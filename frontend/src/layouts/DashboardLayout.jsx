@@ -166,7 +166,7 @@ const studentSubjectTabsInternalAssessment = [
   { toPath: 'ideas', label: 'Idea Generation', icon: 'lightbulb' },
   {
     id: 'ia-guide',
-    label: 'IA Guied',
+    label: 'IA Guide',
     icon: 'guide',
     comingSoon: true,
   },
@@ -190,7 +190,7 @@ const iaOnlySubjectTabs = [
   { toPath: 'ideas', label: 'Idea Generation', icon: 'lightbulb' },
   {
     id: 'ia-guide',
-    label: 'IA Guied',
+    label: 'IA Guide',
     icon: 'guide',
     comingSoon: true,
   },
