@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import QuizAttempt from '../models/QuizAttempt.js';
 import TeacherResource from '../models/TeacherResource.js';
 import { generateQuizReportTips } from '../services/openaiService.js';
+import { studentHasClassAccess } from '../utils/resourceClassAccess.js';
 
 function isValidObjectId(id) {
   return id && typeof id === 'string' && mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
@@ -44,10 +45,9 @@ export const getMyQuizAttempt = async (req, res) => {
     const resource = await TeacherResource.findById(req.params.id).lean();
     if (!resource || resource.type !== 'quiz') return res.status(404).json({ success: false, message: 'Resource not found' });
     if (req.user.role === 'student') {
-      const resourceClassId = (resource.class && (resource.class._id || resource.class))?.toString?.() ?? null;
       const userClassId = (req.user.class && (req.user.class._id || req.user.class))?.toString?.() ?? null;
       if (!resource.published) return res.status(404).json({ success: false, message: 'Resource not found' });
-      if (resourceClassId != null && resourceClassId !== userClassId) return res.status(404).json({ success: false, message: 'Resource not found' });
+      if (!studentHasClassAccess(resource, userClassId)) return res.status(404).json({ success: false, message: 'Resource not found' });
     }
     const attempt = await QuizAttempt.findOne({ resource: req.params.id, student: req.user._id })
       .populate('resource', 'title type')
@@ -70,9 +70,8 @@ export const submitQuizAttempt = async (req, res) => {
     const resource = await TeacherResource.findById(req.params.id).lean();
     if (!resource || resource.type !== 'quiz') return res.status(404).json({ success: false, message: 'Resource not found' });
     if (!resource.published) return res.status(403).json({ success: false, message: 'Quiz is not published' });
-    const resourceClassId = (resource.class && (resource.class._id || resource.class))?.toString?.() ?? null;
     const userClassId = (req.user.class && (req.user.class._id || req.user.class))?.toString?.() ?? null;
-    if (resourceClassId != null && resourceClassId !== userClassId) return res.status(403).json({ success: false, message: 'Not assigned to your class' });
+    if (!studentHasClassAccess(resource, userClassId)) return res.status(403).json({ success: false, message: 'Not assigned to your class' });
 
     const availability = checkQuizAvailability(resource);
     if (!availability.allowed) return res.status(403).json({ success: false, message: availability.message });

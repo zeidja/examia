@@ -26,7 +26,9 @@ import {
   SubjectFeynman,
   SubjectFeedback,
   SubjectDefinitions,
+  SubjectCommandTerms,
   SubjectChecklists,
+  SubjectIaGuide,
   ComingSoonPage,
 } from './pages/dashboard/SubjectContentTabs';
 import { SubjectInsights } from './pages/dashboard/SubjectInsights';
@@ -41,6 +43,7 @@ import { TeacherResources } from './pages/dashboard/TeacherResources';
 import { QuizReport } from './pages/dashboard/QuizReport';
 import { FlashCardReport } from './pages/dashboard/FlashCardReport';
 import { Profile } from './pages/dashboard/Profile';
+import { ActivityLogs } from './pages/dashboard/ActivityLogs';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -85,7 +88,7 @@ function AppRoutes() {
           <Route path="lesson/:noteId/study" element={<LessonStudyPage />} />
           <Route path="resource/:resourceId" element={<ContentView />} />
           <Route path="definitions" element={<SubjectDefinitions />} />
-          <Route path="command-terms" element={<ComingSoonPage title="Command Terms" />} />
+          <Route path="command-terms" element={<SubjectCommandTerms />} />
           <Route path="checklists" element={<SubjectChecklists />} />
           <Route path="quizzes" element={<SubjectQuizzes />} />
           <Route path="insights" element={<SubjectInsights />} />
@@ -95,6 +98,7 @@ function AppRoutes() {
           <Route path="study-and-learn" element={<SubjectStudyLearn />} />
           <Route path="feynman" element={<SubjectFeynman />} />
           <Route path="feedback" element={<SubjectFeedback />} />
+          <Route path="ia-guide" element={<SubjectIaGuide />} />
         </Route>
         <Route path="content/:id" element={<ContentView />} />
         <Route path="resources" element={<TeacherResources />} />
@@ -160,6 +164,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute roles={['super_admin', 'school_admin', 'teacher']}>
               <Classes />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="logs"
+          element={
+            <ProtectedRoute roles={['school_admin', 'teacher']}>
+              <ActivityLogs />
             </ProtectedRoute>
           }
         />

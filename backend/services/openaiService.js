@@ -24,9 +24,16 @@ export async function getPromptConfig(key) {
   };
 }
 
-export async function generateWithPrompt(key, userVars = {}, extraSystemContext = '') {
-  const pack = await loadActivePrompt(key);
-  if (!pack) throw new Error(`AI prompt not found or disabled: ${key}`);
+/** Try keys in order; first active prompt wins (used e.g. subject-specific quiz → generic quizzes). */
+async function generateWithPromptKeys(keys, userVars = {}, extraSystemContext = '') {
+  let pack = null;
+  for (const key of keys) {
+    pack = await loadActivePrompt(key);
+    if (pack) break;
+  }
+  if (!pack) {
+    throw new Error(`AI prompt not found or disabled: ${keys.join(' → ')}`);
+  }
   const systemPrompt = buildSystemPrompt(pack) + (extraSystemContext ? '\n\n' + extraSystemContext : '');
   const userContent = fillTemplate(pack.userPromptTemplate || '', userVars);
   const completion = await openai.chat.completions.create({
@@ -37,8 +44,11 @@ export async function generateWithPrompt(key, userVars = {}, extraSystemContext 
     ],
     temperature: 0.7,
   });
-  const text = completion.choices?.[0]?.message?.content ?? '';
-  return text;
+  return completion.choices?.[0]?.message?.content ?? '';
+}
+
+export async function generateWithPrompt(key, userVars = {}, extraSystemContext = '') {
+  return generateWithPromptKeys([key], userVars, extraSystemContext);
 }
 
 async function ideaGenCompletion(promptKey, userContent, temperature = 0.7) {
@@ -80,9 +90,24 @@ export async function generateFlashCards(subject, topic, count = 10, resourcesCo
   );
 }
 
+/** Prefer subject-specific quiz prompts when the selected subject name matches; always end with generic `quizzes` as fallback. */
+function resolveQuizPromptKeys(subject) {
+  const name = (subject && String(subject).trim()) || '';
+  const lower = name.toLowerCase();
+  const keys = [];
+  if (lower.includes('chemistry') && !lower.includes('biochem')) {
+    keys.push('quizzes_chemistry');
+  } else if (lower.includes('math') || lower.includes('mathematic')) {
+    keys.push('quizzes_math');
+  }
+  keys.push('quizzes');
+  return keys;
+}
+
 export async function generateQuizzes(subject, topic, count = 5, resourcesContext = '') {
   const extra = (resourcesContext || '').trim() ? resourcesContext.trim() : '';
-  return generateWithPrompt('quizzes', { subject, topic, count: String(count) }, extra);
+  const keys = resolveQuizPromptKeys(subject);
+  return generateWithPromptKeys(keys, { subject, topic, count: String(count) }, extra);
 }
 
 export async function generateTOK(promptText, resourcesContext = '') {

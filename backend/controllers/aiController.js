@@ -100,9 +100,12 @@ async function getFileContextForGeneration(req) {
   return null;
 }
 
+const MAX_GENERATION_COUNT = 100;
+
 export const generateFlashCardsHandler = async (req, res) => {
   try {
-    const { subject, topic, count = 10 } = req.body;
+    const { subject, topic, count: rawCount = 10 } = req.body;
+    const count = Math.min(MAX_GENERATION_COUNT, Math.max(1, parseInt(String(rawCount), 10) || 10));
     ensureTeacherSubject(req, subject);
     const context = await getFileContextForGeneration(req);
     if (context == null || !context.trim()) {
@@ -118,7 +121,8 @@ export const generateFlashCardsHandler = async (req, res) => {
 
 export const generateQuizzesHandler = async (req, res) => {
   try {
-    const { subject, topic, count = 5 } = req.body;
+    const { subject, topic, count: rawCount = 5 } = req.body;
+    const count = Math.min(MAX_GENERATION_COUNT, Math.max(1, parseInt(String(rawCount), 10) || 5));
     ensureTeacherSubject(req, subject);
     const context = await getFileContextForGeneration(req);
     if (context == null || !context.trim()) {

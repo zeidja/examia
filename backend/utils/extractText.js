@@ -40,3 +40,18 @@ export async function extractTextFromBuffer(buffer, mimetype, originalname = '')
 
   throw new Error('Unsupported file type. Use PDF, Word (.doc, .docx), or TXT.');
 }
+
+/**
+ * Convert .docx / .dotx to HTML (structure + inline formatting) and plain text (for search / section logic).
+ * Legacy .doc is not supported for HTML; callers should fall back to extractTextFromBuffer only.
+ */
+export async function extractDocxHtmlAndText(buffer) {
+  const [htmlResult, textResult] = await Promise.all([
+    mammoth.convertToHtml({ buffer }, { ignoreEmptyParagraphs: false }),
+    mammoth.extractRawText({ buffer }),
+  ]);
+  return {
+    html: htmlResult?.value ?? '',
+    text: textResult?.value ?? '',
+  };
+}

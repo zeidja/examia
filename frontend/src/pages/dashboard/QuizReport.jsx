@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { MarkdownBlock } from '../../components/MarkdownBlock';
+import { stripDuplicateMcqLetterPrefix } from '../../utils/format';
 
 export function QuizReport() {
   const { resourceId } = useParams();
@@ -131,8 +132,8 @@ export function QuizReport() {
                       {wrongResults.map((r, i) => (
                         <li key={i} className="p-4 rounded-xl bg-white border border-examia-soft/40">
                           <p className="font-medium text-examia-dark mb-1">Q{r.questionIndex + 1}: {r.questionText}</p>
-                          <p className="text-sm text-red-700">Their answer: {(r.options || [])[r.selectedIndex] ?? '—'}</p>
-                          <p className="text-sm text-green-700">Correct: {(r.options || [])[r.correctIndex] ?? '—'}</p>
+                          <p className="text-sm text-red-700">Their answer: {stripDuplicateMcqLetterPrefix((r.options || [])[r.selectedIndex] ?? '', r.selectedIndex) || '—'}</p>
+                          <p className="text-sm text-green-700">Correct: {stripDuplicateMcqLetterPrefix((r.options || [])[r.correctIndex] ?? '', r.correctIndex) || '—'}</p>
                           {r.rationale && (
                             <p className="text-sm text-examia-mid mt-2 pt-2 border-t border-examia-soft/30">
                               <span className="font-medium text-examia-dark">Tip: </span>{r.rationale}

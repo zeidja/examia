@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useOutletContext, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
+import { stripDuplicateMcqLetterPrefix } from '../../utils/format';
 
 /** Teacher-only: detailed view for one student in a subject — quiz attempts, flashcard breakdown, wrong answers, hard cards. */
 export function SubjectInsightsStudentDetail() {
@@ -198,7 +199,7 @@ export function SubjectInsightsStudentDetail() {
                       <div className="space-y-1">
                         {w.options.map((opt, j) => (
                           <p key={j} className={j === w.correctIndex ? 'text-emerald-700 font-medium' : j === w.selectedIndex ? 'text-rose-700' : 'text-examia-mid'}>
-                            {j === w.correctIndex && '✓ '}{j === w.selectedIndex && '✗ '}{opt}
+                            {j === w.correctIndex && '✓ '}{j === w.selectedIndex && '✗ '}{String.fromCharCode(65 + j)}. {stripDuplicateMcqLetterPrefix(opt, j)}
                           </p>
                         ))}
                       </div>

@@ -13,8 +13,17 @@ export function Classes() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', grade: '', school: '' });
   const [expandedId, setExpandedId] = useState(null);
+  const [teacherPick, setTeacherPick] = useState([]);
+  const [teacherList, setTeacherList] = useState([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(false);
+  const [savingTeachers, setSavingTeachers] = useState(false);
 
-  const fetchClasses = () => api.get('/classes').then((r) => setClasses(r.data.classes || []));
+  const fetchClasses = async () => {
+    const r = await api.get('/classes');
+    const list = r.data.classes || [];
+    setClasses(list);
+    return list;
+  };
   useEffect(() => {
     fetchClasses().finally(() => setLoading(false));
   }, []);
@@ -42,6 +51,54 @@ export function Classes() {
   };
 
   const canAdd = me?.role === 'super_admin' || me?.role === 'school_admin';
+  const canAssignTeachers = me?.role === 'super_admin' || me?.role === 'school_admin';
+
+  const openClass = async (c) => {
+    if (expandedId === c._id) {
+      setExpandedId(null);
+      setTeacherList([]);
+      setTeacherPick([]);
+      return;
+    }
+    setExpandedId(c._id);
+    setTeacherPick((c.teachers || []).map((t) => String(t._id || t)));
+    if (!canAssignTeachers) {
+      setTeacherList([]);
+      return;
+    }
+    const sid = c.school?._id || c.school;
+    setLoadingTeachers(true);
+    try {
+      const q = me.role === 'super_admin' && sid ? `?role=teacher&school=${sid}` : '?role=teacher';
+      const r = await api.get(`/users${q}`);
+      setTeacherList(r.data.users || []);
+    } catch {
+      setTeacherList([]);
+    } finally {
+      setLoadingTeachers(false);
+    }
+  };
+
+  const toggleTeacherInPick = (id) => {
+    const sid = String(id);
+    setTeacherPick((prev) => (prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid]));
+  };
+
+  const saveTeachers = async (classId) => {
+    setSavingTeachers(true);
+    try {
+      await api.put(`/classes/${classId}`, { teachers: teacherPick });
+      const list = await fetchClasses();
+      const refreshed = list.find((x) => String(x._id) === String(classId));
+      if (refreshed) {
+        setTeacherPick((refreshed.teachers || []).map((t) => String(t._id || t)));
+      }
+    } catch (err) {
+      await showError(err.response?.data?.message || 'Failed to save teachers');
+    } finally {
+      setSavingTeachers(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -63,7 +120,9 @@ export function Classes() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-examia-dark">Classes</h1>
           <p className="text-examia-mid mt-1 text-sm">
-            {canAdd ? 'Manage classes and view students.' : 'View classes and students in your school.'}
+            {canAdd
+              ? 'Manage classes, assign teachers to each class, and view students.'
+              : 'View classes and students you are assigned to (or all classes in your school if no teacher list is set yet).'}
           </p>
         </div>
         {canAdd && (
@@ -133,13 +192,18 @@ export function Classes() {
             >
               <button
                 type="button"
-                onClick={() => setExpandedId(isExpanded ? null : c._id)}
+                onClick={() => openClass(c)}
                 className="w-full text-left px-6 py-4 flex flex-wrap items-center justify-between gap-2 hover:bg-examia-bg/50 transition-colors"
               >
                 <div>
                   <h3 className="font-semibold text-examia-dark">{c.name}</h3>
                   <p className="text-examia-mid text-sm mt-1">{c.school?.name ?? '—'} · Grade: {c.grade || '—'}</p>
                   <p className="text-examia-mid text-sm mt-1">{students.length} student{students.length !== 1 ? 's' : ''}</p>
+                  {(c.teachers || []).length > 0 && (
+                    <p className="text-examia-mid text-sm mt-1">
+                      {(c.teachers || []).length} assigned teacher{(c.teachers || []).length !== 1 ? 's' : ''}
+                    </p>
+                  )}
                 </div>
                 <span className="text-examia-mid text-sm font-medium">{isExpanded ? 'Hide details' : 'View details'}</span>
               </button>
@@ -168,6 +232,45 @@ export function Classes() {
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {canAssignTeachers && (
+                    <div className="mt-6 pt-4 border-t border-examia-soft/30">
+                      <h4 className="font-medium text-examia-dark mb-1">Assigned teachers</h4>
+                      <p className="text-xs text-examia-mid mb-3 max-w-2xl">
+                        Teachers checked here see this class in their list and can view those students in activity logs and insights.
+                        If none are selected, any teacher in the school can see the class (default).
+                      </p>
+                      {loadingTeachers ? (
+                        <p className="text-sm text-examia-mid">Loading teachers…</p>
+                      ) : teacherList.length === 0 ? (
+                        <p className="text-sm text-examia-mid">No teachers found for this school.</p>
+                      ) : (
+                        <ul className="rounded-xl border border-examia-soft/40 bg-white divide-y divide-examia-soft/30 overflow-hidden mb-4">
+                          {teacherList.map((t) => (
+                            <li key={t._id} className="px-4 py-2.5 flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                className="mt-1 rounded border-examia-soft text-examia-dark focus:ring-examia-mid"
+                                checked={teacherPick.includes(String(t._id))}
+                                onChange={() => toggleTeacherInPick(t._id)}
+                              />
+                              <div>
+                                <span className="font-medium text-examia-dark">{t.name}</span>
+                                <span className="block text-xs text-examia-mid">{t.email}</span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <button
+                        type="button"
+                        disabled={savingTeachers || loadingTeachers}
+                        onClick={() => saveTeachers(c._id)}
+                        className="px-4 py-2 rounded-xl bg-examia-dark text-white text-sm font-medium hover:bg-examia-mid disabled:opacity-50 transition"
+                      >
+                        {savingTeachers ? 'Saving…' : 'Save teacher assignments'}
+                      </button>
+                    </div>
                   )}
                 </div>
               )}

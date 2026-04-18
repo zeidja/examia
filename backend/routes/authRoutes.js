@@ -15,7 +15,7 @@ router.post(
   login
 );
 
-router.post('/logout', logout);
+router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
 router.patch(
   '/me',

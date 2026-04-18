@@ -4,6 +4,11 @@ import QuizAttempt from '../models/QuizAttempt.js';
 import FlashCardRating from '../models/FlashCardRating.js';
 import Class from '../models/Class.js';
 import User from '../models/User.js';
+import {
+  assertTeacherAssignedSubject,
+  assertTeacherCanViewStudent,
+  getVisibleStudentIdsForTeacher,
+} from '../utils/teacherClassAccess.js';
 
 function isValidObjectId(id) {
   return id && typeof id === 'string' && mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
@@ -29,7 +34,7 @@ export const getSubjectInsights = async (req, res) => {
     const resourceFilter = { published: true, subject: subjectId };
     if (schoolId) resourceFilter.school = schoolId;
     if (classId) {
-      resourceFilter.$or = [{ class: classId }, { class: null }];
+      resourceFilter.$or = [{ class: classId }, { classes: classId }, { class: null }];
     } else {
       resourceFilter.class = null;
     }
@@ -142,6 +147,10 @@ export const getTeacherSubjectInsights = async (req, res) => {
     }
 
     const schoolId = req.user.school?._id || req.user.school;
+    if (req.user.role === 'teacher') {
+      const subErr = assertTeacherAssignedSubject(req, subjectId);
+      if (subErr) return res.status(subErr.status).json({ success: false, message: subErr.message });
+    }
     const resourceFilter = { published: true, subject: subjectId, type: { $in: ['quiz', 'flash_cards'] } };
     if (schoolId) resourceFilter.school = schoolId;
     const resources = await TeacherResource.find(resourceFilter).select('_id title type').lean();
@@ -153,10 +162,17 @@ export const getTeacherSubjectInsights = async (req, res) => {
     const resourceTitleById = {};
     resources.forEach((r) => { resourceTitleById[r._id.toString()] = r.title; });
 
-    const [attempts, allRatings] = await Promise.all([
+    let [attempts, allRatings] = await Promise.all([
       quizIds.length > 0 ? QuizAttempt.find({ resource: { $in: quizIds } }).populate('student', 'name').lean() : [],
       flashCardIds.length > 0 ? FlashCardRating.find({ resource: { $in: flashCardIds } }).lean() : [],
     ]);
+
+    if (req.user.role === 'teacher' && schoolId) {
+      const visibleIds = await getVisibleStudentIdsForTeacher(req.user._id, schoolId);
+      const visible = new Set(visibleIds.map((id) => id.toString()));
+      attempts = attempts.filter((a) => visible.has(String(a.student?._id || a.student)));
+      allRatings = allRatings.filter((r) => visible.has(String(r.student)));
+    }
 
     const quizCharts = quizResources.map((r) => {
       const rid = r._id.toString();
@@ -269,6 +285,12 @@ export const getTeacherStudentDetail = async (req, res) => {
     }
 
     const schoolId = req.user.school?._id || req.user.school;
+    if (req.user.role === 'teacher') {
+      const subErr = assertTeacherAssignedSubject(req, subjectId);
+      if (subErr) return res.status(subErr.status).json({ success: false, message: subErr.message });
+      const stErr = await assertTeacherCanViewStudent(req, studentId, schoolId);
+      if (stErr) return res.status(stErr.status).json({ success: false, message: stErr.message });
+    }
     const resourceFilter = { published: true, subject: subjectId, type: { $in: ['quiz', 'flash_cards'] } };
     if (schoolId) resourceFilter.school = schoolId;
     const resources = await TeacherResource.find(resourceFilter).select('_id title type').lean();

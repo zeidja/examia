@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { showError, showConfirm } from '../../utils/swal';
+import { formatDateForDatetimeLocal, datetimeLocalValueToIsoString } from '../../utils/format';
+import { ClassMultiSelectDropdown } from '../../components/ClassMultiSelectDropdown';
 
 const typeLabels = { material: 'Material', quiz: 'Quiz', flash_cards: 'Flashcards' };
 
@@ -13,6 +15,22 @@ const typeFilters = [
   { id: 'flash_cards', label: 'Flashcards' },
   { id: 'material', label: 'Fundamentals' },
 ];
+
+function resourceClassIdsForEdit(r) {
+  if (!r) return [];
+  if (Array.isArray(r.classes) && r.classes.length) {
+    return r.classes.map((c) => String(c._id || c));
+  }
+  if (r.class) return [String(r.class._id || r.class)];
+  return [];
+}
+
+function resourceClassLabel(r) {
+  if (Array.isArray(r.classes) && r.classes.length) {
+    return r.classes.map((c) => (c && typeof c === 'object' ? c.name : c) || '').filter(Boolean).join(', ') || '—';
+  }
+  return r.class?.name || '—';
+}
 
 export function TeacherResources() {
   const { user: me } = useAuth();
@@ -26,7 +44,15 @@ export function TeacherResources() {
   const [uploadFiles, setUploadFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ title: '', class: '', subject: '', availabilityStart: '', deadline: '', timeLimitMinutes: '' });
+  const [editForm, setEditForm] = useState({
+    title: '',
+    class: '',
+    classIds: [],
+    subject: '',
+    availabilityStart: '',
+    deadline: '',
+    timeLimitMinutes: '',
+  });
 
   const filteredResources = typeFilter
     ? resources.filter((r) => r.type === typeFilter)
@@ -58,10 +84,11 @@ export function TeacherResources() {
     setEditingId(r._id);
     setEditForm({
       title: r.title || '',
-      class: (r.class?._id || r.class) || '',
+      class: (r.class?._id || r.class) ? String(r.class._id || r.class) : '',
+      classIds: r.type === 'material' ? [] : resourceClassIdsForEdit(r),
       subject: (r.subject?._id || r.subject) || '',
-      availabilityStart: r.type === 'quiz' && r.availabilityStart ? new Date(r.availabilityStart).toISOString().slice(0, 16) : '',
-      deadline: r.deadline ? new Date(r.deadline).toISOString().slice(0, 16) : '',
+      availabilityStart: r.type === 'quiz' && r.availabilityStart ? formatDateForDatetimeLocal(r.availabilityStart) : '',
+      deadline: r.deadline ? formatDateForDatetimeLocal(r.deadline) : '',
       timeLimitMinutes: r.type === 'quiz' && r.timeLimitMinutes != null ? String(r.timeLimitMinutes) : '',
     });
   };
@@ -71,14 +98,25 @@ export function TeacherResources() {
     if (!editingId) return;
     try {
       const r = resources.find((res) => res._id === editingId);
+      if (r?.type !== 'material' && (!editForm.classIds || editForm.classIds.length === 0)) {
+        await showError('Select at least one class.');
+        return;
+      }
       const payload = {
         title: editForm.title,
-        class: editForm.class || undefined,
         subject: editForm.subject || undefined,
-        deadline: r?.type === 'flash_cards' ? null : (editForm.deadline || null),
+        deadline:
+          r?.type === 'flash_cards'
+            ? null
+            : (editForm.deadline ? datetimeLocalValueToIsoString(editForm.deadline) : null),
       };
+      if (r?.type === 'material') {
+        payload.class = editForm.class || null;
+      } else {
+        payload.classes = editForm.classIds;
+      }
       if (r?.type === 'quiz') {
-        payload.availabilityStart = editForm.availabilityStart || null;
+        payload.availabilityStart = editForm.availabilityStart ? datetimeLocalValueToIsoString(editForm.availabilityStart) : null;
         payload.timeLimitMinutes = editForm.timeLimitMinutes === '' ? null : (parseInt(editForm.timeLimitMinutes, 10) || null);
       }
       await api.put(`/resources/${editingId}`, payload);
@@ -257,7 +295,7 @@ export function TeacherResources() {
             <div>
               <span className="text-xs font-medium text-examia-mid bg-examia-soft/20 px-2 py-1 rounded">{typeLabels[r.type] || r.type}</span>
               <h3 className="font-semibold text-examia-dark mt-2">{r.title}</h3>
-              <p className="text-examia-mid text-sm">Subject: {r.subject?.name || '—'} · Class: {r.class?.name || '—'}</p>
+              <p className="text-examia-mid text-sm">Subject: {r.subject?.name || '—'} · Class{Array.isArray(r.classes) && r.classes.length > 1 ? 'es' : ''}: {resourceClassLabel(r)}</p>
               {r.type === 'quiz' && (r.availabilityStart || r.deadline) && (
                 <p className="text-examia-mid text-sm">
                   {r.availabilityStart && `Start: ${new Date(r.availabilityStart).toLocaleString()}`}
@@ -294,16 +332,27 @@ export function TeacherResources() {
                       <option key={s._id} value={s._id}>{s.name}</option>
                     ))}
                   </select>
-                  <select
-                    value={editForm.class}
-                    onChange={(e) => setEditForm((f) => ({ ...f, class: e.target.value }))}
-                    className="px-2 py-1.5 rounded-lg border border-examia-soft/50 text-sm"
-                  >
-                    <option value="">Class</option>
-                    {classes.map((c) => (
-                      <option key={c._id} value={c._id}>{c.name}</option>
-                    ))}
-                  </select>
+                  {resources.find((res) => res._id === editingId)?.type === 'material' ? (
+                    <select
+                      value={editForm.class}
+                      onChange={(e) => setEditForm((f) => ({ ...f, class: e.target.value }))}
+                      className="px-2 py-1.5 rounded-lg border border-examia-soft/50 text-sm"
+                    >
+                      <option value="">Class</option>
+                      {classes.map((c) => (
+                        <option key={c._id} value={c._id}>{c.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <ClassMultiSelectDropdown
+                      classes={classes}
+                      selectedIds={editForm.classIds}
+                      onChange={(ids) => setEditForm((f) => ({ ...f, classIds: ids }))}
+                      placeholder="Select classes…"
+                      emptyMessage="No classes"
+                      buttonClassName="min-w-[160px]"
+                    />
+                  )}
                   {resources.find((res) => res._id === editingId)?.type === 'quiz' ? (
                     <>
                       <input

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useId, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import katex from 'katex';
@@ -6,6 +7,8 @@ import 'katex/dist/katex.min.css';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { fileNameWithoutExtension } from '../../utils/format';
+import { downloadMaterialsFile } from '../../utils/materialsDownload';
+import { showError } from '../../utils/swal';
 import { MarkdownBlock } from '../../components/MarkdownBlock';
 import { getSubjectCardStyle } from '../../utils/subjectColors';
 
@@ -152,6 +155,7 @@ const FUNDAMENTALS_COMING_SOON = [
     title: 'Command Terms',
     description: 'IB command terms and what they ask for',
     icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+    live: true,
   },
   {
     path: 'checklists',
@@ -901,19 +905,156 @@ function highlightMatches(text, search) {
   return parts.length ? parts : [{ text, highlight: false }];
 }
 
-/** Definitions tab: list definition files and view content in-app (full-screen with search and A–Z filter). */
-export function SubjectDefinitions() {
+/** Top-right style control: downloads original file via `/api/materials/...?download=1` (cookies). */
+function MaterialsDownloadButton({ apiPath, query, suggestedFilename, className = '' }) {
+  const [busy, setBusy] = useState(false);
+  const handle = async () => {
+    setBusy(true);
+    try {
+      await downloadMaterialsFile(apiPath, query, suggestedFilename || 'document');
+    } catch (e) {
+      await showError(e?.message || 'Download failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={handle}
+      disabled={busy}
+      className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-examia-soft/50 bg-white text-sm font-medium text-examia-dark hover:bg-examia-soft/20 disabled:opacity-50 shrink-0 transition-colors ${className}`}
+    >
+      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+      </svg>
+      {busy ? 'Preparing…' : 'Download'}
+    </button>
+  );
+}
+
+/** Word-style HTML from mammoth: readable layout (not pixel-identical to Word). */
+export function FundamentalDocHtmlView({ html }) {
+  const safe = useMemo(
+    () =>
+      DOMPurify.sanitize(html, {
+        USE_PROFILES: { html: true },
+        ADD_ATTR: ['style'],
+      }),
+    [html]
+  );
+  return (
+    <div
+      className="fundamental-doc-html max-w-4xl mx-auto text-examia-dark text-sm sm:text-base leading-relaxed
+        [&_p]:mb-3 [&_p]:mt-0
+        [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-6 [&_h1]:text-examia-dark
+        [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-examia-dark
+        [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4
+        [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 [&_li]:my-0.5
+        [&_table]:w-full [&_table]:border-collapse [&_table]:text-sm [&_table]:my-4
+        [&_th]:border [&_th]:border-examia-soft/50 [&_th]:bg-examia-soft/15 [&_th]:px-2.5 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold
+        [&_td]:border [&_td]:border-examia-soft/40 [&_td]:px-2.5 [&_td]:py-2 [&_td]:align-top
+        [&_strong]:font-semibold [&_em]:italic [&_a]:text-examia-mid [&_a]:underline"
+      dangerouslySetInnerHTML={{ __html: safe }}
+    />
+  );
+}
+
+/** Definitions / Command Terms: auto-open the subject’s document; .docx renders with Word-like structure (via HTML conversion). */
+function SubjectFundamentalDocs({
+  title,
+  listUrl,
+  contentUrl,
+  downloadFileBasePath,
+  emptyTitle,
+  emptyHint,
+  searchLabel,
+}) {
   const { subjectId } = useParams();
+  const searchId = useId();
+  const viewerTitleId = useId();
+  const dismissedRef = useRef(false);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [viewingRelativePath, setViewingRelativePath] = useState(null);
   const [viewingFile, setViewingFile] = useState(null);
   const [viewContent, setViewContent] = useState('');
+  const [contentHtml, setContentHtml] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [letterFilter, setLetterFilter] = useState('all');
   const contentRef = useRef(null);
+
+  const loadFileContent = useCallback(
+    async (relativePath, fileName) => {
+      const pathParam = relativePath || fileName;
+      setViewingRelativePath(pathParam);
+      setViewingFile(fileName || pathParam);
+      setViewContent('');
+      setContentHtml(null);
+      setViewError(null);
+      setSearchQuery('');
+      setLetterFilter('all');
+      setViewLoading(true);
+      try {
+        const res = await api.get(contentUrl, { params: { path: pathParam } });
+        if (res.data?.success) {
+          setViewContent(res.data.content || '');
+          setContentHtml(res.data.contentHtml != null && res.data.contentHtml !== '' ? res.data.contentHtml : null);
+        } else {
+          setViewError(res.data?.message || 'Could not load content.');
+        }
+      } catch (err) {
+        setViewError(err.response?.data?.message || err.message || 'Could not load content.');
+      } finally {
+        setViewLoading(false);
+      }
+    },
+    [contentUrl]
+  );
+
+  useEffect(() => {
+    if (!subjectId) {
+      setLoading(false);
+      setFiles([]);
+      return;
+    }
+    dismissedRef.current = false;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setFiles([]);
+    setViewingFile(null);
+    setViewingRelativePath(null);
+    setViewContent('');
+    setContentHtml(null);
+    setViewError(null);
+    api
+      .get(listUrl, { params: { subjectId } })
+      .then(async (res) => {
+        if (cancelled) return;
+        if (!res.data?.success) {
+          setError(res.data?.message || 'Could not load file list.');
+          return;
+        }
+        const list = res.data.files || [];
+        setFiles(list);
+        if (list.length === 0 || dismissedRef.current) return;
+        if (!cancelled) setLoading(false);
+        await loadFileContent(list[0].relativePath || list[0].name, list[0].name);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.response?.data?.message || err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [subjectId, listUrl, loadFileContent]);
 
   const { all, sections, letters } = useMemo(
     () => getDefinitionsSections(viewContent),
@@ -933,49 +1074,25 @@ export function SubjectDefinitions() {
     return matched.join('\n') || displayedText;
   }, [displayedText, searchQuery]);
 
-  useEffect(() => {
-    if (!subjectId) {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    api
-      .get('/materials/definitions', { params: { subjectId } })
-      .then((res) => {
-        if (!cancelled && res.data?.success) setFiles(res.data.files || []);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.response?.data?.message || err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [subjectId]);
-
-  const openView = (relativePath, fileName) => {
-    setViewingFile(fileName || relativePath);
-    setViewContent('');
-    setViewError(null);
-    setSearchQuery('');
-    setLetterFilter('all');
-    setViewLoading(true);
-    api
-      .get('/materials/definitions/file/content', { params: { path: relativePath || fileName } })
-      .then((res) => {
-        if (res.data?.success) setViewContent(res.data.content || '');
-        else setViewError(res.data?.message || 'Could not load content.');
-      })
-      .catch((err) => setViewError(err.response?.data?.message || err.message || 'Could not load content.'))
-      .finally(() => setViewLoading(false));
-  };
+  /** Formatted Word HTML only for “All” + no search; letter (or search) uses plain text so A–Z glossary filters keep working. */
+  const showRichHtml = Boolean(contentHtml && !searchQuery.trim() && letterFilter === 'all');
+  const showLetterRow = Boolean(letters && letters.length > 0);
 
   const closeView = () => {
+    dismissedRef.current = true;
     setViewingFile(null);
+    setViewingRelativePath(null);
     setViewContent('');
+    setContentHtml(null);
     setViewError(null);
     setSearchQuery('');
     setLetterFilter('all');
+  };
+
+  const reopenDoc = () => {
+    dismissedRef.current = false;
+    const f = files[0];
+    if (f) loadFileContent(f.relativePath || f.name, f.name);
   };
 
   return (
@@ -984,93 +1101,112 @@ export function SubjectDefinitions() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
     >
-      <h2 className="text-lg font-semibold text-examia-dark mb-3">Definitions</h2>
+      <h2 className="text-lg font-semibold text-examia-dark mb-3">{title}</h2>
       {loading && <p className="text-examia-mid text-sm">Loading…</p>}
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {!loading && !error && files.length === 0 && (
         <div className="rounded-2xl border-2 border-examia-soft/30 bg-examia-soft/5 p-6 text-center">
-          <p className="text-examia-dark font-medium">This subject does not have definitions yet.</p>
-          <p className="text-examia-mid text-sm mt-1">Check back later or use other resources for this subject.</p>
+          <p className="text-examia-dark font-medium">{emptyTitle}</p>
+          <p className="text-examia-mid text-sm mt-1">{emptyHint}</p>
         </div>
       )}
-      {!loading && !error && files.length > 0 && (
-        <div className="space-y-2">
-          {files.map((f) => (
-            <button
-              key={f.relativePath || f.name}
-              type="button"
-              onClick={() => openView(f.relativePath || f.name, f.name)}
-              className="w-full sm:max-w-md flex items-center gap-3 rounded-xl border-2 border-examia-soft/30 bg-white hover:bg-examia-soft/10 hover:border-examia-soft/50 p-4 text-left transition-colors"
-            >
-              <span className="flex shrink-0 w-10 h-10 rounded-lg bg-examia-dark/10 text-examia-dark flex items-center justify-center">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </span>
-              <span className="font-medium text-examia-dark truncate">{fileNameWithoutExtension(f.name || f.relativePath)}</span>
-              <span className="ml-auto shrink-0 text-examia-mid">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              </span>
-            </button>
-          ))}
-        </div>
+      {!loading && !error && files.length > 0 && !viewingFile && (
+        <button
+          type="button"
+          onClick={reopenDoc}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-examia-dark text-white text-sm font-medium hover:bg-examia-mid transition-colors"
+        >
+          Open {title}
+        </button>
       )}
 
-      {/* Full-screen viewer with search and letter filter */}
       {viewingFile && (
         <div
           className="fixed inset-0 z-50 flex flex-col bg-white"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="definitions-viewer-title"
+          aria-labelledby={viewerTitleId}
         >
-          <div className="shrink-0 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-examia-soft/30 bg-examia-soft/5">
-            <button
-              type="button"
-              onClick={closeView}
-              className="p-2 rounded-lg text-examia-mid hover:bg-examia-soft/20 hover:text-examia-dark transition-colors"
-              aria-label="Close"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <h3 id="definitions-viewer-title" className="font-semibold text-examia-dark truncate max-w-[200px] sm:max-w-none">
-              {fileNameWithoutExtension(viewingFile)}
-            </h3>
-            <div className="flex-1 min-w-0 flex flex-wrap items-center gap-2 sm:gap-3">
-              <label className="sr-only" htmlFor="definitions-search">Search definitions</label>
+          <div className="shrink-0 border-b border-examia-soft/30 bg-examia-soft/5">
+            <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <button
+                type="button"
+                onClick={closeView}
+                className="p-2 rounded-lg text-examia-mid hover:bg-examia-soft/20 hover:text-examia-dark transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <h3 id={viewerTitleId} className="font-semibold text-examia-dark truncate min-w-0 flex-1 max-w-[min(100%,28rem)]">
+                {fileNameWithoutExtension(viewingFile)}
+              </h3>
+              {files.length > 1 && (
+                <label className="text-xs text-examia-mid shrink-0" htmlFor={`${searchId}-doc`}>
+                  Document
+                  <select
+                    id={`${searchId}-doc`}
+                    className="ml-2 rounded-lg border border-examia-soft/50 bg-white px-2 py-1.5 text-sm text-examia-dark max-w-[220px]"
+                    value={(files.find((f) => f.name === viewingFile) || files[0]).relativePath || (files.find((f) => f.name === viewingFile) || files[0]).name}
+                    onChange={(e) => {
+                      const rel = e.target.value;
+                      const f = files.find((x) => (x.relativePath || x.name) === rel);
+                      if (f) loadFileContent(f.relativePath || f.name, f.name);
+                    }}
+                  >
+                    {files.map((f) => (
+                      <option key={f.relativePath || f.name} value={f.relativePath || f.name}>
+                        {fileNameWithoutExtension(f.name || f.relativePath)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {downloadFileBasePath && viewingRelativePath && (
+                <MaterialsDownloadButton
+                  apiPath={downloadFileBasePath}
+                  query={{ path: viewingRelativePath }}
+                  suggestedFilename={viewingFile || undefined}
+                  className="ml-auto"
+                />
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-4 pb-3 pt-0">
+              <label className="sr-only" htmlFor={searchId}>{searchLabel}</label>
               <input
-                id="definitions-search"
+                id={searchId}
                 type="search"
                 placeholder="Search…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 min-w-[120px] max-w-xs rounded-lg border border-examia-soft/50 bg-white px-3 py-2 text-sm text-examia-dark placeholder:text-examia-mid focus:ring-2 focus:ring-examia-mid focus:border-transparent"
               />
-              <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-xs font-medium text-examia-mid mr-1">Letter:</span>
-                <button
-                  type="button"
-                  onClick={() => setLetterFilter('all')}
-                  className={`px-2.5 py-1 rounded-md text-sm font-medium transition-colors ${letterFilter === 'all' ? 'bg-examia-dark text-white' : 'bg-examia-soft/30 text-examia-dark hover:bg-examia-soft/50'}`}
-                >
-                  All
-                </button>
-                {letters && letters.map((letter) => (
+              {contentHtml && searchQuery.trim() && (
+                <p className="text-[11px] text-examia-mid w-full sm:w-auto">Showing plain text matches; clear search for formatted view.</p>
+              )}
+              {showLetterRow && (
+                <div className="flex items-center gap-1 flex-wrap w-full sm:w-auto">
+                  <span className="text-xs font-medium text-examia-mid mr-1">Letter:</span>
                   <button
-                    key={letter}
                     type="button"
-                    onClick={() => setLetterFilter(letter)}
-                    className={`px-2 py-1 rounded-md text-sm font-medium min-w-[2rem] transition-colors ${letterFilter === letter ? 'bg-examia-dark text-white' : 'bg-examia-soft/30 text-examia-dark hover:bg-examia-soft/50'}`}
+                    onClick={() => setLetterFilter('all')}
+                    className={`px-2.5 py-1 rounded-md text-sm font-medium transition-colors ${letterFilter === 'all' ? 'bg-examia-dark text-white' : 'bg-examia-soft/30 text-examia-dark hover:bg-examia-soft/50'}`}
                   >
-                    {letter}
+                    All
                   </button>
-                ))}
-              </div>
+                  {letters.map((letter) => (
+                    <button
+                      key={letter}
+                      type="button"
+                      onClick={() => setLetterFilter(letter)}
+                      className={`px-2 py-1 rounded-md text-sm font-medium min-w-[2rem] transition-colors ${letterFilter === letter ? 'bg-examia-dark text-white' : 'bg-examia-soft/30 text-examia-dark hover:bg-examia-soft/50'}`}
+                    >
+                      {letter}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <div ref={contentRef} className="flex-1 overflow-auto p-4 sm:p-6 min-h-0">
@@ -1082,7 +1218,10 @@ export function SubjectDefinitions() {
             {viewError && !viewLoading && (
               <p className="text-red-600 text-sm py-4">{viewError}</p>
             )}
-            {!viewLoading && !viewError && (
+            {!viewLoading && !viewError && showRichHtml && (
+              <FundamentalDocHtmlView html={contentHtml} />
+            )}
+            {!viewLoading && !viewError && !showRichHtml && (
               <div className="max-w-4xl mx-auto">
                 <pre className="whitespace-pre-wrap font-sans text-sm sm:text-base leading-relaxed text-examia-dark bg-transparent p-0 border-0">
                   {filteredBySearch.split('\n').map((line, i) => {
@@ -1115,13 +1254,135 @@ export function SubjectDefinitions() {
   );
 }
 
-/** Static “Coming Soon” page for features like Definitions, Command Terms, Checklists. */
+/** IB Internal Assessment guide: opens the matching .docx from /IA Guides for this subject (HTML + styles via mammoth). */
+export function SubjectIaGuide() {
+  const { subjectId } = useParams();
+  const { subject } = useOutletContext() || {};
+  const [contentHtml, setContentHtml] = useState(null);
+  const [content, setContent] = useState('');
+  const [filename, setFilename] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!subjectId) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setContentHtml(null);
+    setContent('');
+    setFilename('');
+    api
+      .get('/materials/ia-guide', { params: { subjectId } })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.data?.success) {
+          setContent(res.data.content || '');
+          setContentHtml(res.data.contentHtml != null && res.data.contentHtml !== '' ? res.data.contentHtml : null);
+          setFilename(res.data.filename || '');
+        } else {
+          setError(res.data?.message || 'Could not load the guide.');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.response?.data?.message || err.message || 'Could not load the guide.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [subjectId]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-examia-mid border-t-transparent" />
+        <p className="text-sm text-examia-mid font-medium">Loading IA guide…</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-2xl border-2 border-amber-200 bg-amber-50/50 p-6 text-center max-w-xl">
+        <p className="font-medium text-examia-dark">IA guide</p>
+        <p className="text-sm text-amber-900 mt-2">{error}</p>
+      </motion.section>
+    );
+  }
+
+  return (
+    <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="text-xl font-bold text-examia-dark">IA guide</h2>
+          <p className="text-examia-mid text-sm mt-1">
+            {subject?.name ? `Guide for ${subject.name}.` : 'Official-style guide for your internal assessment.'} Formatting follows the Word
+            document (headings, lists, tables).
+          </p>
+          {filename && <p className="text-xs text-examia-mid mt-1">Source: {filename}</p>}
+        </div>
+        {subjectId && filename && (
+          <MaterialsDownloadButton
+            apiPath="/materials/ia-guide/file"
+            query={{ subjectId }}
+            suggestedFilename={filename}
+            className="shrink-0"
+          />
+        )}
+      </div>
+      <div className="rounded-2xl border border-examia-soft/40 bg-white p-5 sm:p-8 shadow-sm">
+        {contentHtml ? (
+          <FundamentalDocHtmlView html={contentHtml} />
+        ) : (
+          <pre className="whitespace-pre-wrap font-sans text-sm text-examia-dark leading-relaxed">{content || 'No content.'}</pre>
+        )}
+      </div>
+    </motion.section>
+  );
+}
+
+export function SubjectDefinitions() {
+  return (
+    <SubjectFundamentalDocs
+      title="Definitions"
+      listUrl="/materials/definitions"
+      contentUrl="/materials/definitions/file/content"
+      downloadFileBasePath="/materials/definitions/file"
+      emptyTitle="This subject does not have definitions yet."
+      emptyHint="Check back later or use other resources for this subject."
+      searchLabel="Search definitions"
+    />
+  );
+}
+
+export function SubjectCommandTerms() {
+  return (
+    <SubjectFundamentalDocs
+      title="Command Terms"
+      listUrl="/materials/command-terms"
+      contentUrl="/materials/command-terms/file/content"
+      downloadFileBasePath="/materials/command-terms/file"
+      emptyTitle="No command terms document is linked to this subject yet."
+      emptyHint="If you expected IB command terms here, ask your admin to match the subject name to the files in commandterms."
+      searchLabel="Search command terms"
+    />
+  );
+}
+
+/** Static “Coming Soon” page for features still under development. */
 export function SubjectChecklists() {
   const { subjectId } = useParams();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewingFile, setViewingFile] = useState(null);
+  const [viewingRelativePath, setViewingRelativePath] = useState(null);
   const [viewContent, setViewContent] = useState('');
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState(null);
@@ -1167,6 +1428,7 @@ export function SubjectChecklists() {
   }, [subjectId]);
 
   const openView = (relativePath, fileName) => {
+    setViewingRelativePath(relativePath);
     setViewingFile(fileName || relativePath);
     setViewContent('');
     setViewError(null);
@@ -1181,7 +1443,13 @@ export function SubjectChecklists() {
       .finally(() => setViewLoading(false));
   };
 
-  const closeView = () => { setViewingFile(null); setViewContent(''); setViewError(null); setSearchQuery(''); };
+  const closeView = () => {
+    setViewingFile(null);
+    setViewingRelativePath(null);
+    setViewContent('');
+    setViewError(null);
+    setSearchQuery('');
+  };
 
   return (
     <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
@@ -1232,12 +1500,24 @@ export function SubjectChecklists() {
       )}
       {viewingFile && (
         <div className="fixed inset-0 z-50 flex flex-col bg-white" role="dialog" aria-modal="true" aria-labelledby="checklists-viewer-title">
-          <div className="shrink-0 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-examia-soft/30 bg-examia-soft/5">
-            <button type="button" onClick={closeView} className="p-2 rounded-lg text-examia-mid hover:bg-examia-soft/20 hover:text-examia-dark transition-colors" aria-label="Close">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-            <h3 id="checklists-viewer-title" className="font-semibold text-examia-dark truncate max-w-[200px] sm:max-w-none">{fileNameWithoutExtension(viewingFile)}</h3>
-            <div className="flex-1 min-w-0 flex flex-wrap items-center gap-2">
+          <div className="shrink-0 border-b border-examia-soft/30 bg-examia-soft/5">
+            <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <button type="button" onClick={closeView} className="p-2 rounded-lg text-examia-mid hover:bg-examia-soft/20 hover:text-examia-dark transition-colors" aria-label="Close">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+              <h3 id="checklists-viewer-title" className="font-semibold text-examia-dark truncate min-w-0 flex-1 max-w-[min(100%,28rem)]">
+                {fileNameWithoutExtension(viewingFile)}
+              </h3>
+              {viewingRelativePath && (
+                <MaterialsDownloadButton
+                  apiPath="/materials/checklists/file"
+                  query={{ path: viewingRelativePath }}
+                  suggestedFilename={viewingFile || undefined}
+                  className="ml-auto"
+                />
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 px-4 pb-3 pt-0">
               <label className="sr-only" htmlFor="checklists-search">Search checklists</label>
               <input
                 id="checklists-search"

@@ -3,6 +3,7 @@ import { useParams, useOutletContext, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { stripDuplicateMcqLetterPrefix } from '../../utils/format';
 
 const TEACHER_ROLES = ['teacher', 'school_admin', 'super_admin'];
 
@@ -423,7 +424,7 @@ export function SubjectInsights() {
                           onClick={() => { setRecallSelected(j); setRecallRevealed(true); }}
                           className="w-full text-left px-4 py-3 rounded-xl border-2 border-examia-soft/50 bg-white hover:border-examia-mid hover:bg-examia-soft/20 transition font-medium text-examia-dark"
                         >
-                          {String.fromCharCode(65 + j)}. {opt}
+                          {String.fromCharCode(65 + j)}. {stripDuplicateMcqLetterPrefix(opt, j)}
                         </button>
                       ))}
                     </div>
@@ -437,12 +438,12 @@ export function SubjectInsights() {
                               j === correctIndex ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : j === recallSelected ? 'bg-rose-100 text-rose-800 border border-rose-200' : 'bg-examia-soft/20 text-examia-dark border border-examia-soft/40'
                             }`}
                           >
-                            {String.fromCharCode(65 + j)}. {opt} {j === correctIndex && ' ✓'}
+                            {String.fromCharCode(65 + j)}. {stripDuplicateMcqLetterPrefix(opt, j)} {j === correctIndex && ' ✓'}
                           </span>
                         ))}
                       </div>
                       <p className={`text-sm font-semibold ${isCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
-                        {isCorrect ? 'Correct!' : 'Incorrect. Correct answer: ' + (options[correctIndex] ?? '—')}
+                        {isCorrect ? 'Correct!' : 'Incorrect. Correct answer: ' + (stripDuplicateMcqLetterPrefix(options[correctIndex] ?? '', correctIndex) || '—')}
                       </p>
                       {item?.rationale && (
                         <p className="text-sm text-examia-dark pt-2 border-t border-examia-soft/30">{item.rationale}</p>
@@ -478,8 +479,14 @@ export function SubjectInsights() {
           <div className="space-y-3">
             {wrongAnswerBank.map((item, i) => {
               const open = expandedWrong.has(i);
-              const correctOption = item.options && item.options[item.correctIndex];
-              const selectedOption = item.selectedIndex >= 0 && item.options ? item.options[item.selectedIndex] : '(not answered)';
+              const correctOption =
+                item.options && item.options[item.correctIndex] != null
+                  ? stripDuplicateMcqLetterPrefix(item.options[item.correctIndex], item.correctIndex)
+                  : '';
+              const selectedOption =
+                item.selectedIndex >= 0 && item.options && item.options[item.selectedIndex] != null
+                  ? stripDuplicateMcqLetterPrefix(item.options[item.selectedIndex], item.selectedIndex)
+                  : '(not answered)';
               return (
                 <div
                   key={`${item.resourceId}-${item.questionIndex}-${i}`}
@@ -518,7 +525,7 @@ export function SubjectInsights() {
                           <ul className="text-sm text-examia-dark list-disc list-inside space-y-0.5">
                             {item.options.map((opt, j) => (
                               <li key={j} className={j === item.correctIndex ? 'text-emerald-700 font-medium' : j === item.selectedIndex ? 'text-rose-600' : ''}>
-                                {opt}
+                                {String.fromCharCode(65 + j)}. {stripDuplicateMcqLetterPrefix(opt, j)}
                                 {j === item.correctIndex && ' ✓'}
                                 {j === item.selectedIndex && j !== item.correctIndex && ' (your choice)'}
                               </li>

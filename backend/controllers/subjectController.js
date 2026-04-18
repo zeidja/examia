@@ -73,7 +73,15 @@ export const createSubject = async (req, res) => {
 
 export const getSubjects = async (req, res) => {
   try {
-    const subjects = await Subject.find({ isActive: true }).sort({ name: 1 });
+    const query = { isActive: true };
+    if (req.user?.role === 'teacher') {
+      const sid = req.user.subject?._id || req.user.subject;
+      if (!sid) {
+        return res.json({ success: true, subjects: [] });
+      }
+      query._id = sid;
+    }
+    const subjects = await Subject.find(query).sort({ name: 1 });
     res.json({ success: true, subjects });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -84,6 +92,12 @@ export const getSubjectById = async (req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
     if (!subject) return res.status(404).json({ success: false, message: 'Subject not found' });
+    if (req.user?.role === 'teacher') {
+      const sid = req.user.subject?._id || req.user.subject;
+      if (!sid || String(subject._id) !== String(sid)) {
+        return res.status(403).json({ success: false, message: 'You do not have access to this subject' });
+      }
+    }
     res.json({ success: true, subject });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

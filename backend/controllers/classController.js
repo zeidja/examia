@@ -1,5 +1,6 @@
 import Class from '../models/Class.js';
 import User from '../models/User.js';
+import { teacherSeesClass } from '../utils/teacherClassAccess.js';
 
 export const createClass = async (req, res) => {
   try {
@@ -20,7 +21,15 @@ export const getClasses = async (req, res) => {
     if (req.user?.role === 'school_admin' && req.user?.school) filter.school = req.user.school._id || req.user.school;
     if (req.user?.role === 'teacher' && req.user?.school) filter.school = req.user.school._id || req.user.school;
     if (req.query.school) filter.school = req.query.school;
-    const classes = await Class.find(filter).populate('school', 'name').populate('students', 'name email').sort({ name: 1 });
+    let classes = await Class.find(filter)
+      .populate('school', 'name')
+      .populate('students', 'name email')
+      .populate('teachers', 'name email')
+      .sort({ name: 1 });
+
+    if (req.user?.role === 'teacher') {
+      classes = classes.filter((c) => teacherSeesClass(req.user._id, c));
+    }
 
     for (const cls of classes) {
       if (cls.students.length === 0) {
@@ -41,8 +50,14 @@ export const getClasses = async (req, res) => {
 
 export const getClassById = async (req, res) => {
   try {
-    const cls = await Class.findById(req.params.id).populate('school', 'name').populate('students', 'name email');
+    const cls = await Class.findById(req.params.id)
+      .populate('school', 'name')
+      .populate('students', 'name email')
+      .populate('teachers', 'name email');
     if (!cls) return res.status(404).json({ success: false, message: 'Class not found' });
+    if (req.user?.role === 'teacher' && !teacherSeesClass(req.user._id, cls)) {
+      return res.status(403).json({ success: false, message: 'Not allowed to view this class' });
+    }
     res.json({ success: true, class: cls });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -51,9 +66,41 @@ export const getClassById = async (req, res) => {
 
 export const updateClass = async (req, res) => {
   try {
-    const cls = await Class.findByIdAndUpdate(req.params.id, req.body, { new: true }).populate('school', 'name').populate('students', 'name email');
+    const cls = await Class.findById(req.params.id);
     if (!cls) return res.status(404).json({ success: false, message: 'Class not found' });
-    res.json({ success: true, class: cls });
+    if (req.user?.role === 'school_admin' && req.user?.school && String(cls.school) !== String(req.user.school._id || req.user.school)) {
+      return res.status(403).json({ success: false, message: 'Not allowed' });
+    }
+
+    const patch = {};
+    if (req.body.name !== undefined) patch.name = String(req.body.name).trim();
+    if (req.body.grade !== undefined) patch.grade = String(req.body.grade ?? '').trim();
+    if (req.body.isActive !== undefined) patch.isActive = Boolean(req.body.isActive);
+    if (req.body.teachers !== undefined) {
+      if (!Array.isArray(req.body.teachers)) {
+        return res.status(400).json({ success: false, message: 'teachers must be an array of user ids' });
+      }
+      const ids = [...new Set(req.body.teachers.map((id) => String(id)))];
+      if (ids.length === 0) {
+        patch.teachers = [];
+      } else {
+        const count = await User.countDocuments({ _id: { $in: ids }, role: 'teacher', school: cls.school });
+        if (count !== ids.length) {
+          return res.status(400).json({ success: false, message: 'Each teacher id must be a teacher in this class school' });
+        }
+        patch.teachers = ids;
+      }
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid fields to update' });
+    }
+
+    const updated = await Class.findByIdAndUpdate(req.params.id, { $set: patch }, { new: true })
+      .populate('school', 'name')
+      .populate('students', 'name email')
+      .populate('teachers', 'name email');
+    res.json({ success: true, class: updated });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

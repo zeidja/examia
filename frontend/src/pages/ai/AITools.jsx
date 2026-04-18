@@ -4,8 +4,9 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import { fileNameWithoutExtension } from '../../utils/format';
+import { fileNameWithoutExtension, datetimeLocalValueToIsoString, stripDuplicateMcqLetterPrefix } from '../../utils/format';
 import { MarkdownBlock } from '../../components/MarkdownBlock';
+import { ClassMultiSelectDropdown } from '../../components/ClassMultiSelectDropdown';
 
 const tabs = [
   { id: 'flash_cards', label: 'Flash Cards', path: 'flash-cards' },
@@ -108,7 +109,7 @@ function QuizPreview({ data }) {
                   <span className="shrink-0 w-6 h-6 rounded-full bg-examia-soft/40 flex items-center justify-center text-xs font-medium">
                     {String.fromCharCode(65 + j)}
                   </span>
-                  {opt}
+                  {stripDuplicateMcqLetterPrefix(opt, j)}
                   {Number(q.correct) === j && (
                     <span className="text-xs text-examia-mid ml-1">(correct)</span>
                   )}
@@ -302,13 +303,19 @@ export function AITools() {
   const [loading, setLoading] = useState(false);
   const [resultByTab, setResultByTab] = useState({}); // one result per tab: { flash_cards: '...', quizzes: '...', ... }
   const [showRawEdit, setShowRawEdit] = useState(false);
-  const [saveForm, setSaveForm] = useState({ title: '', class: '', availabilityStart: '', deadline: '', timeLimitMinutes: '' });
+  const [saveForm, setSaveForm] = useState({
+    title: '',
+    classIds: [],
+    availabilityStart: '',
+    deadline: '',
+    timeLimitMinutes: '',
+  });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({
     subject: '',
     topic: '',
-    count: 10,
+    countInput: '10',
     prompt: '',
     sourceType: '', // '' | 'my_materials' | 'platform_materials'
     selectedFile: '', // resourceId (when my_materials) or relativePath (when platform_materials)
@@ -399,7 +406,8 @@ export function AITools() {
     setLoading(true);
     try {
       if (activeTab === 'flash_cards') {
-        const body = { subject: form.subject, topic: form.topic, count: form.count };
+        const count = Math.min(100, Math.max(1, parseInt(String(form.countInput).trim(), 10) || 10));
+        const body = { subject: form.subject, topic: form.topic, count };
         if (form.sourceType === 'my_materials' && form.selectedFile) {
           body.sourceType = 'my_materials';
           body.resourceId = form.selectedFile;
@@ -410,7 +418,8 @@ export function AITools() {
         const { data } = await api.post('/ai/flash-cards', body);
         setResultByTab((prev) => ({ ...prev, [activeTab]: data.content || '' }));
       } else if (activeTab === 'quizzes') {
-        const body = { subject: form.subject, topic: form.topic, count: form.count };
+        const count = Math.min(100, Math.max(1, parseInt(String(form.countInput).trim(), 10) || 10));
+        const body = { subject: form.subject, topic: form.topic, count };
         if (form.sourceType === 'my_materials' && form.selectedFile) {
           body.sourceType = 'my_materials';
           body.resourceId = form.selectedFile;
@@ -440,22 +449,43 @@ export function AITools() {
   const handleSaveResource = async (e) => {
     e.preventDefault();
     const currentResult = resultByTab[activeTab];
-    if (!saveForm.title || !saveForm.class || !currentResult) return;
+    if (!currentResult) return;
+    if (!saveForm.title?.trim()) {
+      await showError('Title is required.');
+      return;
+    }
+    if (!saveForm.classIds?.length) {
+      await showError('Select at least one class.');
+      return;
+    }
+    const type = activeTab === 'flash_cards' ? 'flash_cards' : activeTab === 'quizzes' ? 'quiz' : null;
+    if (!type) return;
+    if (type === 'quiz') {
+      if (!saveForm.availabilityStart?.trim()) {
+        await showError('Start date and time are required for quizzes.');
+        return;
+      }
+      if (!saveForm.deadline?.trim()) {
+        await showError('End date and time are required for quizzes.');
+        return;
+      }
+    }
     setSaving(true);
     try {
-      const type = activeTab === 'flash_cards' ? 'flash_cards' : activeTab === 'quizzes' ? 'quiz' : null;
-      if (!type) return;
       const subjectId = form.subject ? (subjects.find((s) => s.name === form.subject)?._id || null) : null;
       const payload = {
         type,
         title: saveForm.title.trim(),
         content: currentResult,
-        class: saveForm.class,
+        classes: saveForm.classIds,
         subject: subjectId || undefined,
-        deadline: type === 'flash_cards' ? undefined : (saveForm.deadline || undefined),
+        deadline:
+          type === 'flash_cards'
+            ? undefined
+            : datetimeLocalValueToIsoString(saveForm.deadline),
       };
       if (type === 'quiz') {
-        if (saveForm.availabilityStart) payload.availabilityStart = saveForm.availabilityStart;
+        payload.availabilityStart = datetimeLocalValueToIsoString(saveForm.availabilityStart);
         if (saveForm.timeLimitMinutes !== '') {
           const mins = parseInt(saveForm.timeLimitMinutes, 10);
           payload.timeLimitMinutes = mins >= 1 ? mins : undefined;
@@ -463,7 +493,7 @@ export function AITools() {
       }
       await api.post('/resources', payload);
       setSaved(true);
-      setSaveForm({ title: '', class: '', availabilityStart: '', deadline: '', timeLimitMinutes: '' });
+      setSaveForm({ title: '', classIds: [], availabilityStart: '', deadline: '', timeLimitMinutes: '' });
     } catch (err) {
       await showError(err.response?.data?.message || 'Failed to save');
     } finally {
@@ -584,15 +614,17 @@ export function AITools() {
                     </div>
                   )}
                   <div>
-                    <label className="block text-sm font-medium text-examia-dark mb-1">Count</label>
+                    <label className="block text-sm font-medium text-examia-dark mb-1">Count (1–100)</label>
                     <input
-                      type="number"
-                      min={1}
-                      max={50}
-                      value={form.count}
-                      onChange={(e) => setForm((f) => ({ ...f, count: Number(e.target.value) || 10 }))}
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="e.g. 10"
+                      value={form.countInput}
+                      onChange={(e) => setForm((f) => ({ ...f, countInput: e.target.value }))}
                       className="w-full px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark"
                     />
+                    <p className="text-xs text-examia-mid mt-1">You can clear the field and type a new number.</p>
                   </div>
                 </>
               )}
@@ -669,9 +701,13 @@ export function AITools() {
 
             {showSaveOption && (
               <form onSubmit={handleSaveResource} className="p-4 rounded-xl bg-examia-soft/20 border border-examia-soft/50 space-y-3">
-                <h4 className="font-medium text-examia-dark">Assign to class & save</h4>
-                <p className="text-sm text-examia-dark">Save this (with any edits) so you can assign it to a class and publish it for students.</p>
-                <div className="flex flex-wrap gap-3">
+                <h4 className="font-medium text-examia-dark">Assign to class(es) & save</h4>
+                <p className="text-sm text-examia-dark">
+                  {activeTab === 'quizzes'
+                    ? 'Title, at least one class, start time, and end time are required before saving. Then publish from Library when ready.'
+                    : 'Title and at least one class are required. Then publish from Library when ready.'}
+                </p>
+                <div className="flex flex-wrap gap-3 items-start">
                   <input
                     required
                     placeholder="Title (e.g. Cell division quiz)"
@@ -679,35 +715,44 @@ export function AITools() {
                     onChange={(e) => setSaveForm((f) => ({ ...f, title: e.target.value }))}
                     className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark flex-1 min-w-[200px]"
                   />
-                  <select
-                    required
-                    value={saveForm.class}
-                    onChange={(e) => setSaveForm((f) => ({ ...f, class: e.target.value }))}
-                    className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark"
-                  >
-                    <option value="">Select class</option>
-                    {classes.map((c) => (
-                      <option key={c._id} value={c._id}>{c.name}</option>
-                    ))}
-                  </select>
+                  <div className="w-full min-w-[220px] max-w-md space-y-1">
+                    <span className="text-sm font-medium text-examia-dark block mb-1">Classes <span className="text-red-600">*</span></span>
+                    <ClassMultiSelectDropdown
+                      classes={classes}
+                      selectedIds={saveForm.classIds}
+                      onChange={(ids) => setSaveForm((f) => ({ ...f, classIds: ids }))}
+                      placeholder="Select classes…"
+                      emptyMessage="No classes loaded."
+                    />
+                  </div>
                   {activeTab === 'quizzes' && (
                     <>
-                      <input
-                        type="datetime-local"
-                        placeholder="Start (optional)"
-                        title="Students can attempt from this date/time"
-                        value={saveForm.availabilityStart}
-                        onChange={(e) => setSaveForm((f) => ({ ...f, availabilityStart: e.target.value }))}
-                        className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark"
-                      />
-                      <input
-                        type="datetime-local"
-                        placeholder="End (optional)"
-                        title="Students cannot attempt after this date/time"
-                        value={saveForm.deadline}
-                        onChange={(e) => setSaveForm((f) => ({ ...f, deadline: e.target.value }))}
-                        className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark"
-                      />
+                      <div className="flex flex-col gap-0.5">
+                        <label className="text-xs font-medium text-examia-dark">
+                          Start <span className="text-red-600">*</span>
+                        </label>
+                        <input
+                          type="datetime-local"
+                          required
+                          title="Students can attempt from this date/time"
+                          value={saveForm.availabilityStart}
+                          onChange={(e) => setSaveForm((f) => ({ ...f, availabilityStart: e.target.value }))}
+                          className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <label className="text-xs font-medium text-examia-dark">
+                          End <span className="text-red-600">*</span>
+                        </label>
+                        <input
+                          type="datetime-local"
+                          required
+                          title="Students cannot attempt after this date/time"
+                          value={saveForm.deadline}
+                          onChange={(e) => setSaveForm((f) => ({ ...f, deadline: e.target.value }))}
+                          className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark"
+                        />
+                      </div>
                     </>
                   )}
                   {activeTab === 'quizzes' && (

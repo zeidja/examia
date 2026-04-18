@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import FlashCardRating from '../models/FlashCardRating.js';
 import TeacherResource from '../models/TeacherResource.js';
+import { studentHasClassAccess } from '../utils/resourceClassAccess.js';
 
 function isValidObjectId(id) {
   return id && typeof id === 'string' && mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
@@ -18,6 +19,11 @@ export const submitRating = async (req, res) => {
     const resource = await TeacherResource.findById(req.params.id).lean();
     if (!resource || resource.type !== 'flash_cards') {
       return res.status(404).json({ success: false, message: 'Resource not found' });
+    }
+    if (req.user.role === 'student') {
+      if (!resource.published) return res.status(404).json({ success: false, message: 'Resource not found' });
+      const userClassId = (req.user.class && (req.user.class._id || req.user.class))?.toString?.() ?? null;
+      if (!studentHasClassAccess(resource, userClassId)) return res.status(404).json({ success: false, message: 'Resource not found' });
     }
     const { cardIndex, rating } = req.body;
     const index = typeof cardIndex === 'number' ? cardIndex : parseInt(cardIndex, 10);
@@ -57,6 +63,9 @@ export const getRatings = async (req, res) => {
     }
 
     if (req.user.role === 'student') {
+      if (!resource.published) return res.status(404).json({ success: false, message: 'Resource not found' });
+      const userClassId = (req.user.class && (req.user.class._id || req.user.class))?.toString?.() ?? null;
+      if (!studentHasClassAccess(resource, userClassId)) return res.status(404).json({ success: false, message: 'Resource not found' });
       const ratings = await FlashCardRating.find({
         resource: req.params.id,
         student: req.user._id,

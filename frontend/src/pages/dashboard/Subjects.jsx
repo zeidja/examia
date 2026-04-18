@@ -89,7 +89,9 @@ export function Subjects() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-examia-dark">Subjects</h1>
           <p className="text-examia-mid mt-1 text-sm max-w-xl">
-            Subjects are synced from the materials folder. Each subject name matches a folder under Materials.
+            {user?.role === 'teacher'
+              ? 'Your school assigned you to one subject. Use it to open insights and related tools.'
+              : 'Subjects are synced from the materials folder. Each subject name matches a folder under Materials.'}
           </p>
         </div>
         {user?.role === 'super_admin' && (
@@ -111,9 +113,11 @@ export function Subjects() {
         )}
       </div>
 
-      <p className="text-examia-mid text-sm mb-6">
-        The list below is synced from the <strong>materials</strong> folder. Use &quot;Sync from materials&quot; to refresh after adding new folders.
-      </p>
+      {user?.role !== 'teacher' && (
+        <p className="text-examia-mid text-sm mb-6">
+          The list below is synced from the <strong>materials</strong> folder. Use &quot;Sync from materials&quot; to refresh after adding new folders.
+        </p>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {subjects.map((s) => {
           const cardStyle = getSubjectCardStyle(s);

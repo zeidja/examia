@@ -92,6 +92,11 @@ const NavIcons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6v12a1.5 1.5 0 01-1.5 1.5H4.5A1.5 1.5 0 013 21V9z" />
     </svg>
   ),
+  logs: (
+    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+    </svg>
+  ),
 };
 
 function fireComingSoonNavAlert(onNavigate, featureLabel) {
@@ -118,6 +123,7 @@ const flatNavIcons = {
   'Quizzes': 'clipboard',
   'Resources': 'folder',
   'Library': 'library',
+  Logs: 'logs',
 };
 
 const superAdminNav = [
@@ -135,6 +141,7 @@ const schoolAdminNav = [
   { to: '/subjects', label: 'Subjects' },
   { to: '/classes', label: 'Classes' },
   { to: '/users', label: 'Users' },
+  { to: '/logs', label: 'Logs' },
 ];
 
 const teacherNav = [
@@ -144,6 +151,7 @@ const teacherNav = [
   { to: '/ai/flash-cards', label: 'Flashcards' },
   { to: '/ai/quizzes', label: 'Quizzes' },
   { to: '/resources', label: 'Library' },
+  { to: '/logs', label: 'Logs' },
 ];
 
 /** Student nav: main links + optional subject section with icons and grouping */
@@ -164,12 +172,7 @@ const studentSubjectTabsBeforeIA = [
 const studentSubjectTabsInternalAssessment = [
   { toPath: 'feedback', label: 'Feedback Generator', icon: 'fileCheck' },
   { toPath: 'ideas', label: 'Idea Generation', icon: 'lightbulb' },
-  {
-    id: 'ia-guide',
-    label: 'IA Guide',
-    icon: 'guide',
-    comingSoon: true,
-  },
+  { toPath: 'ia-guide', label: 'IA Guide', icon: 'guide' },
 ];
 
 /** Tabs shown after the Internal Assessment dropdown. */
@@ -188,12 +191,7 @@ const studentSubjectTabsAfterIA = [
 const iaOnlySubjectTabs = [
   { toPath: 'feedback', label: 'Feedback Generator', icon: 'fileCheck' },
   { toPath: 'ideas', label: 'Idea Generation', icon: 'lightbulb' },
-  {
-    id: 'ia-guide',
-    label: 'IA Guide',
-    icon: 'guide',
-    comingSoon: true,
-  },
+  { toPath: 'ia-guide', label: 'IA Guide', icon: 'guide' },
 ];
 
 function isPathUnderSubject(pathname, sid) {

@@ -4,6 +4,69 @@ export const QUIZ_RATIONALE_SUFFIX = `OUTPUT REQUIREMENT: Your response must be 
 - "question" (string), "options" (array of 4 strings), "correct" (number 0-3), and "rationale" (string).
 - "rationale": a short explanation of why the correct answer is right, based on the material. This is shown to students after they answer. Do not omit it.`;
 
+/** Seeded prompts that use {@link QUIZ_RATIONALE_SUFFIX} by default (admin can still edit per key). */
+export const QUIZ_PROMPT_KEYS_WITH_SUFFIX = ['quizzes', 'quizzes_math', 'quizzes_chemistry'];
+
+const QUIZ_USER_PROMPT_TEMPLATE =
+  'Subject: {{subject}}. Topic: {{topic}}. Generate {{count}} multiple-choice questions. If material was provided in the system message above, use it as the sole source and cover it fully. Each question must have exactly 4 options. Output only a valid JSON object with a "questions" array. Each element must include: "question", "options" (array of 4 strings), "correct" (0–3), and "rationale" (a short explanation of why the correct answer is right, for student feedback).';
+
+const QUIZ_INTRO_GENERIC = `You are IB Homework Quiz Generator.
+
+Your task is to generate multiple-choice quiz questions from the user's uploaded material (or from the given subject/topic if no material is provided) for homework, revision, and progress tracking. These questions are NOT required to be IB exam-style. They must be content-accurate, comprehensive, and diagnostic.`;
+
+const QUIZ_INTRO_MATH = `You are IB Homework Quiz Generator for **Mathematics**.
+
+Mathematics-specific expectations (in addition to all rules below):
+- Use correct notation and units exactly as they appear in the material (indices, fractions, symbols, SI units).
+- Prefer conceptual understanding, definitions, properties, and short recognition or light application; avoid long multi-step numerical drills unless the source material clearly contains comparable worked arithmetic.
+- Keep all four options structurally parallel (e.g. all expressions, all numbers, or all short phrases — not a mix that gives away the answer).
+
+Your task is to generate multiple-choice quiz questions from the user's uploaded material (or from the given subject/topic if no material is provided) for homework, revision, and progress tracking. These questions are NOT required to be IB exam-style. They must be content-accurate, comprehensive, and diagnostic.`;
+
+const QUIZ_INTRO_CHEMISTRY = `You are IB Homework Quiz Generator for **Chemistry**.
+
+Chemistry-specific expectations (in addition to all rules below):
+- Represent formulas, ions, states (s, l, g, aq) and reaction conditions consistently with the source; do not invent reagents or unsafe lab procedures.
+- Test nomenclature, bonding, periodic trends, and quantitative ideas only when grounded in the uploaded material.
+- Distractors should reflect typical student confusions (e.g. mistaken particle model, wrong species) without introducing facts absent from the material.
+
+Your task is to generate multiple-choice quiz questions from the user's uploaded material (or from the given subject/topic if no material is provided) for homework, revision, and progress tracking. These questions are NOT required to be IB exam-style. They must be content-accurate, comprehensive, and diagnostic.`;
+
+const QUIZ_SHARED_MCQ_RULES = `PRIMARY GOAL
+Generate MCQs that collectively test ALL important content in the provided material, so that teachers can later select, hide, or reorder questions; student performance can be quantitatively tracked; and misconceptions can be identified by wrong option choice.
+
+CORE RULES (STRICT)
+
+1️⃣ Full Coverage Rule (MANDATORY)
+You must generate questions that cover EVERY important idea in the material, including: definitions, explanations, mechanisms, relationships, distinctions, assumptions, formulas (if any), exceptions and edge cases.
+❌ Do NOT summarize. Do NOT skip "minor" details. Do NOT merge multiple concepts into one vague question. If a concept exists → it must be tested by at least one MCQ.
+
+2️⃣ Question Design Rules
+Each question must: test ONE clear concept; be answerable using ONLY the provided material; avoid ambiguous wording; avoid trick logic. Preferred cognitive levels: recall, understanding, simple application. Avoid: long calculations, multi-step reasoning chains, IB command-term phrasing (e.g. "evaluate", "discuss").
+
+3️⃣ Options Structure
+Each question must have 4 options: 1 correct answer and 3 plausible distractors. Distractors must be realistic and reflect common misunderstandings; not obviously silly or irrelevant. Do NOT use "All of the above" or "None of the above". Do NOT vary number of options.
+
+4️⃣ Rationale Rule
+For each question, you may include a rationale that explains the correct answer (for teacher reference). The rationale must be grounded strictly in the provided material. Do NOT introduce new facts.
+
+5️⃣ No Hallucination Rule
+Use ONLY the uploaded material (or subject/topic). Do NOT add external facts, examples, or extensions. If something is unclear in the material, reflect that uncertainty in the question.
+
+SINGLE-RUN COMPLETION RULE: You must generate ALL questions in one task. Do NOT ask "Do you want to continue?" or "Should I generate more?". If the material is long, generate as many questions as needed; never ask for confirmation.
+
+QUALITY CHECK: Before finishing, verify that every key concept is tested, no question tests more than one idea, all distractors are plausible, and no question exceeds reasonable homework difficulty.
+
+FINAL REMINDER: Your goal is coverage + diagnosability, not exam simulation. If a student scores highly on this quiz, they should demonstrably understand all the content in the uploaded material.
+
+OUTPUT FORMAT (MANDATORY FOR THIS SYSTEM): You must respond with ONLY a valid JSON object. No markdown, no code fences, no other text. Use this exact structure: {"questions": [{"question": "...", "options": ["A)", "B)", "C)", "D)"], "correct": 0, "rationale": "..."}, ...]} where "correct" is the index of the correct option (0=A, 1=B, 2=C, 3=D). You MUST include "rationale" for each question: a brief explanation of why the correct answer is right (for student feedback after the attempt). Example: {"questions": [{"question": "What is X?", "options": ["Option A", "Option B", "Option C", "Option D"], "correct": 1, "rationale": "Option B is correct because..."}]}`;
+
+function buildQuizSystemPrompt(introBlock) {
+  return `${introBlock}
+
+${QUIZ_SHARED_MCQ_RULES}`;
+}
+
 export const CORE_AI_PROMPT_SPECS_RAW = [
   {
     key: 'flash_cards',
@@ -58,40 +121,23 @@ OUTPUT FORMAT (MANDATORY FOR THIS SYSTEM): You must respond with ONLY a valid JS
   {
     key: 'quizzes',
     name: 'Quizzes',
-    systemPrompt: `You are IB Homework Quiz Generator.
-
-Your task is to generate multiple-choice quiz questions from the user's uploaded material (or from the given subject/topic if no material is provided) for homework, revision, and progress tracking. These questions are NOT required to be IB exam-style. They must be content-accurate, comprehensive, and diagnostic.
-
-PRIMARY GOAL
-Generate MCQs that collectively test ALL important content in the provided material, so that teachers can later select, hide, or reorder questions; student performance can be quantitatively tracked; and misconceptions can be identified by wrong option choice.
-
-CORE RULES (STRICT)
-
-1️⃣ Full Coverage Rule (MANDATORY)
-You must generate questions that cover EVERY important idea in the material, including: definitions, explanations, mechanisms, relationships, distinctions, assumptions, formulas (if any), exceptions and edge cases.
-❌ Do NOT summarize. Do NOT skip "minor" details. Do NOT merge multiple concepts into one vague question. If a concept exists → it must be tested by at least one MCQ.
-
-2️⃣ Question Design Rules
-Each question must: test ONE clear concept; be answerable using ONLY the provided material; avoid ambiguous wording; avoid trick logic. Preferred cognitive levels: recall, understanding, simple application. Avoid: long calculations, multi-step reasoning chains, IB command-term phrasing (e.g. "evaluate", "discuss").
-
-3️⃣ Options Structure
-Each question must have 4 options: 1 correct answer and 3 plausible distractors. Distractors must be realistic and reflect common misunderstandings; not obviously silly or irrelevant. Do NOT use "All of the above" or "None of the above". Do NOT vary number of options.
-
-4️⃣ Rationale Rule
-For each question, you may include a rationale that explains the correct answer (for teacher reference). The rationale must be grounded strictly in the provided material. Do NOT introduce new facts.
-
-5️⃣ No Hallucination Rule
-Use ONLY the uploaded material (or subject/topic). Do NOT add external facts, examples, or extensions. If something is unclear in the material, reflect that uncertainty in the question.
-
-SINGLE-RUN COMPLETION RULE: You must generate ALL questions in one task. Do NOT ask "Do you want to continue?" or "Should I generate more?". If the material is long, generate as many questions as needed; never ask for confirmation.
-
-QUALITY CHECK: Before finishing, verify that every key concept is tested, no question tests more than one idea, all distractors are plausible, and no question exceeds reasonable homework difficulty.
-
-FINAL REMINDER: Your goal is coverage + diagnosability, not exam simulation. If a student scores highly on this quiz, they should demonstrably understand all the content in the uploaded material.
-
-OUTPUT FORMAT (MANDATORY FOR THIS SYSTEM): You must respond with ONLY a valid JSON object. No markdown, no code fences, no other text. Use this exact structure: {"questions": [{"question": "...", "options": ["A)", "B)", "C)", "D)"], "correct": 0, "rationale": "..."}, ...]} where "correct" is the index of the correct option (0=A, 1=B, 2=C, 3=D). You MUST include "rationale" for each question: a brief explanation of why the correct answer is right (for student feedback after the attempt). Example: {"questions": [{"question": "What is X?", "options": ["Option A", "Option B", "Option C", "Option D"], "correct": 1, "rationale": "Option B is correct because..."}]}`,
-    userPromptTemplate: 'Subject: {{subject}}. Topic: {{topic}}. Generate {{count}} multiple-choice questions. If material was provided in the system message above, use it as the sole source and cover it fully. Each question must have exactly 4 options. Output only a valid JSON object with a "questions" array. Each element must include: "question", "options" (array of 4 strings), "correct" (0–3), and "rationale" (a short explanation of why the correct answer is right, for student feedback).',
-    description: 'IB Homework Quiz Generator — full coverage MCQs from uploaded material',
+    systemPrompt: buildQuizSystemPrompt(QUIZ_INTRO_GENERIC),
+    userPromptTemplate: QUIZ_USER_PROMPT_TEMPLATE,
+    description: 'Default homework MCQ generator for any subject. Mathematics and Chemistry use dedicated prompts when enabled; this prompt is the fallback and applies to all other subjects.',
+  },
+  {
+    key: 'quizzes_math',
+    name: 'Quizzes — Mathematics',
+    systemPrompt: buildQuizSystemPrompt(QUIZ_INTRO_MATH),
+    userPromptTemplate: QUIZ_USER_PROMPT_TEMPLATE,
+    description: 'MCQ quiz generator when the selected subject is Mathematics (AA, AI, or other math courses). Editable independently from generic quizzes.',
+  },
+  {
+    key: 'quizzes_chemistry',
+    name: 'Quizzes — Chemistry',
+    systemPrompt: buildQuizSystemPrompt(QUIZ_INTRO_CHEMISTRY),
+    userPromptTemplate: QUIZ_USER_PROMPT_TEMPLATE,
+    description: 'MCQ quiz generator when the selected subject is Chemistry. Editable independently from generic quizzes.',
   },
   {
     key: 'quiz_report_tips',
@@ -166,6 +212,8 @@ Keep the response concise (about 150–250 words). Use clear headings or bullet 
 const CORE_META = {
   flash_cards: { category: 'generation', sortOrder: 10 },
   quizzes: { category: 'generation', sortOrder: 20 },
+  quizzes_math: { category: 'generation', sortOrder: 21 },
+  quizzes_chemistry: { category: 'generation', sortOrder: 22 },
   quiz_report_tips: { category: 'utility', sortOrder: 30 },
   tok: { category: 'generation', sortOrder: 40 },
   external_assessment: { category: 'generation', sortOrder: 50 },
@@ -187,7 +235,7 @@ export function getCoreAiPromptSpecs() {
       systemPrompt: p.systemPrompt,
       userPromptTemplate: p.userPromptTemplate,
       configJson: '',
-      systemSuffix: p.key === 'quizzes' ? QUIZ_RATIONALE_SUFFIX : '',
+      systemSuffix: QUIZ_PROMPT_KEYS_WITH_SUFFIX.includes(p.key) ? QUIZ_RATIONALE_SUFFIX : '',
       category: meta.category,
       sortOrder: meta.sortOrder,
       isActive: true,

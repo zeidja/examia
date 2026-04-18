@@ -16,6 +16,8 @@ const teacherResourceSchema = new mongoose.Schema(
     school: { type: mongoose.Schema.Types.ObjectId, ref: 'School', required: true },
     subject: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', default: null },
     class: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', default: null },
+    /** When set, quiz/flashcards are visible to students in any of these classes (see also `class` for legacy/single). */
+    classes: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Class' }], default: [] },
     published: { type: Boolean, default: false },
     deadline: { type: Date, default: null },
     availabilityStart: { type: Date, default: null }, // quiz only: students can attempt from this date/time
@@ -26,6 +28,7 @@ const teacherResourceSchema = new mongoose.Schema(
 
 teacherResourceSchema.index({ createdBy: 1 });
 teacherResourceSchema.index({ class: 1, published: 1 });
+teacherResourceSchema.index({ classes: 1, published: 1 });
 teacherResourceSchema.index({ class: 1, subject: 1, published: 1 });
 teacherResourceSchema.index({ school: 1 });
 export default mongoose.model('TeacherResource', teacherResourceSchema);

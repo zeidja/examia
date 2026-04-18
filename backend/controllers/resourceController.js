@@ -7,6 +7,11 @@ import path from 'path';
 import fs from 'fs';
 import { uploadsDir } from '../middleware/upload.js';
 import { sendNewResourceNotification } from '../services/emailService.js';
+import {
+  assignedClassIdStrings,
+  normalizeResourceClassFields,
+  studentHasClassAccess,
+} from '../utils/resourceClassAccess.js';
 
 function isValidObjectId(id) {
   return id && typeof id === 'string' && mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
@@ -25,7 +30,7 @@ export const list = async (req, res) => {
       if (schoolId) filter.school = schoolId;
       // Show resources assigned to student's class OR school-wide (no class = by subject)
       if (classId) {
-        filter.$or = [{ class: classId }, { class: null }];
+        filter.$or = [{ class: classId }, { classes: classId }, { class: null }];
       } else {
         filter.class = null;
       }
@@ -34,6 +39,7 @@ export const list = async (req, res) => {
         .populate('createdBy', 'name')
         .populate('subject', 'name')
         .populate('class', 'name')
+        .populate('classes', 'name')
         .sort({ createdAt: -1 });
       // For students, annotate quiz resources with whether they have already attempted them
       const quizResources = resources.filter((r) => r.type === 'quiz');
@@ -72,6 +78,7 @@ export const list = async (req, res) => {
         .populate('createdBy', 'name')
         .populate('subject', 'name')
         .populate('class', 'name')
+        .populate('classes', 'name')
         .sort({ createdAt: -1 });
       return res.json({ success: true, resources });
     }
@@ -90,18 +97,24 @@ export const create = async (req, res) => {
       body.school = req.user.school._id || req.user.school;
       if (req.user.role === 'teacher' && req.user.subject) body.subject = req.user.subject._id || req.user.subject;
     }
-    if (body.deadline === '' || body.deadline === null) body.deadline = undefined;
+    if (body.deadline === '' || body.deadline === null || body.deadline === undefined) {
+      body.deadline = undefined;
+    } else {
+      body.deadline = new Date(body.deadline);
+    }
     if (body.type === 'quiz' && body.availabilityStart !== undefined) {
       body.availabilityStart = body.availabilityStart === '' || body.availabilityStart === null ? null : new Date(body.availabilityStart);
     }
     if (body.type === 'quiz' && body.timeLimitMinutes !== undefined) {
       body.timeLimitMinutes = body.timeLimitMinutes === '' || body.timeLimitMinutes === null ? null : Math.max(1, Number(body.timeLimitMinutes) || 0) || null;
     }
+    normalizeResourceClassFields(body);
     const resource = await TeacherResource.create(body);
     const populated = await TeacherResource.findById(resource._id)
       .populate('createdBy', 'name')
       .populate('subject', 'name')
-      .populate('class', 'name');
+      .populate('class', 'name')
+      .populate('classes', 'name');
     res.status(201).json({ success: true, resource: populated });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -162,13 +175,13 @@ export const getOne = async (req, res) => {
       .populate('createdBy', 'name')
       .populate('subject', 'name')
       .populate('class', 'name')
+      .populate('classes', 'name')
       .lean();
     if (!resource) return res.status(404).json({ success: false, message: 'Resource not found' });
-    const resourceClassId = (resource.class && (resource.class._id || resource.class))?.toString?.() ?? null;
     const userClassId = (req.user.class && (req.user.class._id || req.user.class))?.toString?.() ?? null;
     if (req.user.role === 'student') {
       if (!resource.published) return res.status(404).json({ success: false, message: 'Resource not found' });
-      if (resourceClassId != null && resourceClassId !== userClassId) return res.status(404).json({ success: false, message: 'Resource not found' });
+      if (!studentHasClassAccess(resource, userClassId)) return res.status(404).json({ success: false, message: 'Resource not found' });
     } else if (req.user.role === 'teacher') {
       const createdById = (resource.createdBy && (resource.createdBy._id || resource.createdBy))?.toString?.();
       if (createdById !== req.user._id.toString()) return res.status(404).json({ success: false, message: 'Resource not found' });
@@ -190,11 +203,29 @@ export const update = async (req, res) => {
     if (req.user.role === 'teacher' && resource.createdBy.toString() !== req.user._id.toString()) {
       return res.status(403).json({ success: false, message: 'Not your resource' });
     }
-    const { title, description, class: classId, subject: subjectId, published, deadline, availabilityStart, timeLimitMinutes } = req.body;
+    const {
+      title,
+      description,
+      class: classId,
+      classes: classesInput,
+      subject: subjectId,
+      published,
+      deadline,
+      availabilityStart,
+      timeLimitMinutes,
+    } = req.body;
     const wasPublished = resource.published;
     if (title != null) resource.title = title;
     if (description != null) resource.description = description;
-    if (classId !== undefined) resource.class = classId === '' || classId === null ? null : classId;
+    if (classesInput !== undefined || classId !== undefined) {
+      const next = {
+        class: classId !== undefined ? classId : resource.class,
+        classes: classesInput !== undefined ? classesInput : resource.classes,
+      };
+      normalizeResourceClassFields(next);
+      resource.class = next.class;
+      resource.classes = next.classes;
+    }
     if (subjectId !== undefined) resource.subject = subjectId === '' || subjectId === null ? null : subjectId;
     if (typeof published === 'boolean') resource.published = published;
     if (deadline !== undefined) resource.deadline = deadline === '' || deadline === null ? null : new Date(deadline);
@@ -207,14 +238,17 @@ export const update = async (req, res) => {
     await resource.save();
     if (!wasPublished && resource.published) {
       const schoolId = resource.school?._id || resource.school;
+      const cids = assignedClassIdStrings(resource);
       let students;
-      if (resource.class) {
-        students = await User.find({ role: 'student', class: resource.class._id || resource.class }).select('email').lean();
+      if (cids.length === 1) {
+        students = await User.find({ role: 'student', class: cids[0] }).select('email').lean();
+      } else if (cids.length > 1) {
+        students = await User.find({ role: 'student', class: { $in: cids } }).select('email').lean();
       } else {
-        const classIds = await Class.find({ school: schoolId }).distinct('_id');
-        students = await User.find({ role: 'student', class: { $in: classIds } }).select('email').lean();
+        const allClassIds = await Class.find({ school: schoolId }).distinct('_id');
+        students = await User.find({ role: 'student', class: { $in: allClassIds } }).select('email').lean();
       }
-      const emails = students.map((s) => s.email).filter(Boolean);
+      const emails = [...new Set(students.map((s) => s.email).filter(Boolean))];
       if (emails.length) {
         sendNewResourceNotification(emails, resource.title, resource.type, resource.deadline).catch((err) => console.error('Notify error:', err));
       }
@@ -222,7 +256,8 @@ export const update = async (req, res) => {
     const populated = await TeacherResource.findById(resource._id)
       .populate('createdBy', 'name')
       .populate('subject', 'name')
-      .populate('class', 'name');
+      .populate('class', 'name')
+      .populate('classes', 'name');
     res.json({ success: true, resource: populated });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -256,11 +291,10 @@ export const downloadFile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'File not found' });
     }
     if (!fs.existsSync(resource.filePath)) return res.status(404).json({ success: false, message: 'File not found' });
-    const resourceClassId = (resource.class?._id || resource.class)?.toString();
     const userClassId = (req.user.class?._id || req.user.class)?.toString();
     if (req.user.role === 'student') {
       if (!resource.published) return res.status(404).json({ success: false, message: 'Not found' });
-      if (resourceClassId != null && resourceClassId !== userClassId) return res.status(404).json({ success: false, message: 'Not found' });
+      if (!studentHasClassAccess(resource, userClassId)) return res.status(404).json({ success: false, message: 'Not found' });
     } else if (req.user.role === 'teacher' && resource.createdBy.toString() !== req.user._id.toString()) {
       return res.status(404).json({ success: false, message: 'Not found' });
     }

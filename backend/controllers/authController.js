@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import OTP from '../models/OTP.js';
 import { generateToken } from '../utils/jwt.js';
+import { recordActivity } from '../utils/recordActivity.js';
 import { sendOTPEmail, sendPasswordResetConfirmation } from '../services/emailService.js';
 import crypto from 'crypto';
 
@@ -56,6 +57,20 @@ export const login = async (req, res) => {
     res.cookie('token', token, cookieOptions);
     const u = user.toObject();
     delete u.password;
+    const schoolId = user.school?._id || user.school;
+    if (schoolId) {
+      await recordActivity({
+        schoolId,
+        actorId: user._id,
+        actorRole: user.role,
+        actorName: user.name,
+        action: 'login',
+        summary: 'Signed in',
+        method: 'POST',
+        path: '/api/auth/login',
+        statusCode: 200,
+      });
+    }
     res.json({ success: true, user: u, token });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message || 'Login failed' });
@@ -63,6 +78,25 @@ export const login = async (req, res) => {
 };
 
 export const logout = async (req, res) => {
+  try {
+    const u = req.user;
+    const schoolId = u?.school?._id || u?.school;
+    if (schoolId && u?._id) {
+      await recordActivity({
+        schoolId,
+        actorId: u._id,
+        actorRole: u.role,
+        actorName: u.name,
+        action: 'logout',
+        summary: 'Signed out',
+        method: 'POST',
+        path: '/api/auth/logout',
+        statusCode: 200,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
   res.cookie('token', '', { ...cookieOptions, maxAge: 0 });
   res.json({ success: true });
 };

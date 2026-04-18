@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { extractTextFromBuffer } from '../utils/extractText.js';
@@ -7,6 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MATERIALS_PATH = path.resolve(__dirname, '../../materials');
 const DEFINITIONS_PATH = path.resolve(__dirname, '../../Definitions');
 const CHECKLISTS_PATH = path.resolve(__dirname, '../../Checklists');
+const COMMAND_TERMS_PATH = path.resolve(__dirname, '../../commandterms');
+const IA_GUIDES_PATH = path.resolve(__dirname, '../../IA Guides');
 
 const mimeByExt = {
   '.pdf': 'application/pdf',
@@ -283,6 +286,104 @@ export function resolveDefinitionsPath(basename) {
   return full;
 }
 
+function normalizeCommandTermsMatchKey(s) {
+  return (s || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[:–—]/g, ' ')
+    .replace(/-/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Strip "IB … Command Terms" filenames to a comparable subject fragment. */
+export function commandTermsFileMatchStem(fileName) {
+  const ext = path.extname(fileName).toLowerCase();
+  if (!['.docx', '.doc', '.pdf', '.txt'].includes(ext)) return '';
+  let base = path.basename(fileName, ext).replace(/\s+/g, ' ').trim();
+  base = base.replace(/^IB\s+/i, '').trim();
+  base = base.replace(/\s*[—–-]\s*Command Terms.*$/i, '').trim();
+  base = base.replace(/\s+Command Terms.*$/i, '').trim();
+  return normalizeCommandTermsMatchKey(base);
+}
+
+/** Map common subject labels to phrases that appear in official IB command-terms document titles. */
+const COMMAND_TERMS_SUBJECT_ALIASES = {
+  business: 'business management',
+  'global politics': 'global politics',
+  globalpolitics: 'global politics',
+  gp: 'global politics',
+  'math aa': 'mathematics analysis and approaches',
+  mathaa: 'mathematics analysis and approaches',
+  'mathematics analysis and approaches': 'mathematics analysis and approaches',
+  'mathematics: analysis and approaches': 'mathematics analysis and approaches',
+  'math ai': 'mathematics application and interpretation',
+  mathai: 'mathematics application and interpretation',
+  'mathematics application and interpretation': 'mathematics application and interpretation',
+  'mathematics: applications and interpretation': 'mathematics application and interpretation',
+};
+
+function subjectKeysForCommandTermsMatch(subjectName) {
+  const raw = (subjectName || '').trim();
+  if (!raw) return [];
+  const n = normalizeCommandTermsMatchKey(raw);
+  const keys = new Set([n, n.replace(/\s/g, '')]);
+  const compact = n.replace(/\s/g, '');
+  const alias = COMMAND_TERMS_SUBJECT_ALIASES[n] || COMMAND_TERMS_SUBJECT_ALIASES[compact];
+  if (alias) {
+    const a = normalizeCommandTermsMatchKey(alias);
+    keys.add(a);
+    keys.add(a.replace(/\s/g, ''));
+  }
+  return [...keys].filter(Boolean);
+}
+
+function commandTermsStemMatchesSubject(stem, subjectName) {
+  if (!stem) return false;
+  for (const key of subjectKeysForCommandTermsMatch(subjectName)) {
+    if (stem.includes(key) || key.includes(stem)) return true;
+  }
+  const n = normalizeCommandTermsMatchKey(subjectName);
+  const words = n.split(' ').filter((w) => w.length > 1);
+  if (words.length && words.every((w) => stem.includes(w))) return true;
+  const stemWords = stem.split(' ').filter((w) => w.length > 1);
+  if (stemWords.length && stemWords.every((w) => n.includes(w))) return true;
+  return false;
+}
+
+/**
+ * List command-terms files for a subject (docx in /commandterms, matched to subject name / materialsPath).
+ */
+export async function getCommandTermsForSubject(subjectName) {
+  const name = (subjectName || '').trim();
+  if (!name) return [];
+  try {
+    const entries = await fs.readdir(COMMAND_TERMS_PATH, { withFileTypes: true });
+    const files = [];
+    for (const ent of entries) {
+      if (!ent.isFile() || ent.name.startsWith('.')) continue;
+      const ext = path.extname(ent.name).toLowerCase();
+      if (!['.docx', '.doc', '.pdf', '.txt'].includes(ext)) continue;
+      const stem = commandTermsFileMatchStem(ent.name);
+      if (commandTermsStemMatchesSubject(stem, name)) {
+        files.push({ name: ent.name, relativePath: ent.name });
+      }
+    }
+    return files.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (err) {
+    if (err.code === 'ENOENT') return [];
+    throw err;
+  }
+}
+
+export function resolveCommandTermsPath(basename) {
+  if (!basename || typeof basename !== 'string') return null;
+  const safe = path.basename(basename).replace(/\.\./g, '');
+  const full = path.resolve(COMMAND_TERMS_PATH, safe);
+  if (!full.startsWith(COMMAND_TERMS_PATH)) return null;
+  return full;
+}
+
 /** Map subject name / materialsPath to Checklists folder name (e.g. "Biology" -> "Biology Checklists"). */
 const CHECKLIST_FOLDER_ALIASES = {
   'biology': 'Biology Checklists',
@@ -367,4 +468,68 @@ export function resolveChecklistsPath(relativePath) {
   const full = path.resolve(CHECKLISTS_PATH, normalized);
   if (!full.startsWith(CHECKLISTS_PATH)) return null;
   return full;
+}
+
+/** First matching rule wins (TOK exhibition before essay). Filenames must match repo IA Guides/. */
+const IA_GUIDE_RULES = [
+  { re: /tok\s*exhibition|exhibition/i, file: 'IB Theory of Knowledge Exhibition Guide.docx' },
+  { re: /tok\s*essay|^tok$/i, file: 'IB Theory of Knowledge Essay Guide.docx' },
+  {
+    re: /analysis\s*&\s*approaches|mathematics\s*[-–]\s*analysis|mathematics\s*:\s*analysis|math\s*aa|\baa\b/i,
+    file: 'IB Mathematics Analysis Guide.docx',
+  },
+  {
+    re: /application\s*&\s*interpretation|mathematics\s*[-–]\s*application|mathematics\s*:\s*application|math\s*ai|\bai\b/i,
+    file: 'IB Mathematics Applications Guide.docx',
+  },
+  { re: /global\s*politics/i, file: 'IB Global Politics Engagement Project Guide.docx' },
+  { re: /business\s*management|^business$/i, file: 'IB Business Management Internal Assessment Guide.docx' },
+  { re: /biology/i, file: 'IB Biology Internal Assessment Guide.docx' },
+  { re: /chemistry/i, file: 'IB Chemistry Internal Assessment Guide.docx' },
+  { re: /physics/i, file: 'IB Physics Internal Assessment Guide.docx' },
+  { re: /economics/i, file: 'IB Economics Internal Assessment Guide.docx' },
+  { re: /psychology/i, file: 'IB Psychology Internal Assessment Guide.docx' },
+];
+
+/**
+ * Resolve full path to the IA Guide .docx for a subject display name (or materialsPath).
+ * Returns null if folder missing, no match, or file not on disk.
+ */
+export async function findIaGuideFileForSubject(subjectName) {
+  const name = (subjectName || '').trim();
+  if (!name) return null;
+
+  for (const { re, file } of IA_GUIDE_RULES) {
+    if (!re.test(name)) continue;
+    const full = path.resolve(IA_GUIDES_PATH, path.basename(file));
+    if (!full.startsWith(IA_GUIDES_PATH)) continue;
+    if (existsSync(full)) return full;
+  }
+
+  try {
+    const entries = await fs.readdir(IA_GUIDES_PATH, { withFileTypes: true });
+    const docx = entries.filter((e) => e.isFile() && e.name.toLowerCase().endsWith('.docx')).map((e) => e.name);
+    const lower = name.toLowerCase();
+    const words = lower.split(/\s+/).filter((w) => w.length > 2);
+    let best = null;
+    let bestScore = 0;
+    for (const fname of docx) {
+      const fl = fname.toLowerCase();
+      let score = 0;
+      for (const w of words) {
+        if (fl.includes(w)) score += w.length;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = fname;
+      }
+    }
+    if (best && bestScore >= 5) {
+      const full = path.resolve(IA_GUIDES_PATH, best);
+      if (full.startsWith(IA_GUIDES_PATH) && existsSync(full)) return full;
+    }
+  } catch {
+    /* ENOENT */
+  }
+  return null;
 }

@@ -5,6 +5,7 @@ import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { useQuizFullscreen } from '../../context/QuizFullscreenContext';
 import { MarkdownBlock } from '../../components/MarkdownBlock';
+import { stripDuplicateMcqLetterPrefix } from '../../utils/format';
 
 /** Parse stored content as flash cards (JSON array with front/back or question/answer) */
 function parseFlashCards(content) {
@@ -351,12 +352,12 @@ function QuizResultsView({ score, maxScore, results, alreadyAttempted }) {
                   {!answeredThis ? (
                     <span className="text-examia-mid">Skipped</span>
                   ) : isCorrect ? (
-                    <span className="text-green-700">Your answer (correct): {opts[r.selectedIndex] ?? '—'}</span>
+                    <span className="text-green-700">Your answer (correct): {stripDuplicateMcqLetterPrefix(opts[r.selectedIndex] ?? '', r.selectedIndex) || '—'}</span>
                   ) : (
                     <>
-                      <span className="text-red-700">Your answer: {opts[r.selectedIndex] ?? '—'}</span>
+                      <span className="text-red-700">Your answer: {stripDuplicateMcqLetterPrefix(opts[r.selectedIndex] ?? '', r.selectedIndex) || '—'}</span>
                       <br />
-                      <span className="text-green-700">Correct: {opts[r.correctIndex] ?? '—'}</span>
+                      <span className="text-green-700">Correct: {stripDuplicateMcqLetterPrefix(opts[r.correctIndex] ?? '', r.correctIndex) || '—'}</span>
                       {r.rationale && (
                         <>
                           <br />
@@ -572,7 +573,7 @@ function QuizViewer({ questions, resourceId, timeLimitMinutes }) {
                 <span className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold border-2 border-current">
                   {letters[j] ?? j + 1}
                 </span>
-                <span className="font-medium">{opt}</span>
+                <span className="font-medium">{stripDuplicateMcqLetterPrefix(opt, j)}</span>
               </button>
             );
           })}

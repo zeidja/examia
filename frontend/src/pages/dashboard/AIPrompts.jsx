@@ -373,6 +373,22 @@ export function AIPrompts() {
               >
                 {editorTab === 'overview' && (
                   <div className="space-y-6 max-w-3xl">
+                    {(selected.key === 'quizzes' ||
+                      selected.key === 'quizzes_math' ||
+                      selected.key === 'quizzes_chemistry') && (
+                      <div className="rounded-xl border border-examia-soft/30 bg-examia-soft/10 px-4 py-3 text-sm text-examia-dark leading-relaxed">
+                        <p className="font-semibold text-examia-dark mb-1">Quiz prompts (routing)</p>
+                        <p className="text-examia-mid text-xs sm:text-sm">
+                          When a teacher generates a quiz, the subject name selects the prompt:{' '}
+                          <span className="font-mono text-examia-dark">quizzes_chemistry</span> for Chemistry (excluding
+                          &quot;Biochemistry&quot;), <span className="font-mono text-examia-dark">quizzes_math</span> for
+                          Mathematics, otherwise <span className="font-mono text-examia-dark">quizzes</span>. If the
+                          subject-specific prompt is missing or inactive, the app falls back to{' '}
+                          <span className="font-mono text-examia-dark">quizzes</span>. Each key can be edited independently
+                          (system prompt, user template, config JSON, extra rules).
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-sm font-medium text-examia-dark mb-2">Description</label>
                       <textarea

@@ -15,6 +15,8 @@ import resourceRoutes from './routes/resourceRoutes.js';
 import ideaRoutes from './routes/ideaRoutes.js';
 import insightsRoutes from './routes/insightsRoutes.js';
 import lessonNoteRoutes from './routes/lessonNoteRoutes.js';
+import activityLogRoutes from './routes/activityLogRoutes.js';
+import { attachActivityHttpLogger } from './middleware/activityHttpLogger.js';
 
 connectDB();
 
@@ -30,6 +32,7 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+app.use('/api', attachActivityHttpLogger);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/schools', schoolRoutes);
@@ -43,6 +46,7 @@ app.use('/api/resources', resourceRoutes);
 app.use('/api/ideas', ideaRoutes);
 app.use('/api/insights', insightsRoutes);
 app.use('/api/lesson-notes', lessonNoteRoutes);
+app.use('/api/activity-logs', activityLogRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

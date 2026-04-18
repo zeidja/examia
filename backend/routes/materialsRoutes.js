@@ -16,9 +16,17 @@ router.get('/definitions', authorize('student', 'super_admin', 'school_admin', '
 router.get('/definitions/file', authorize('student', 'super_admin', 'school_admin', 'teacher'), materialsController.getDefinitionsFile);
 router.get('/definitions/file/content', authorize('student', 'super_admin', 'school_admin', 'teacher'), materialsController.getDefinitionsFileContent);
 
+router.get('/command-terms', authorize('student', 'super_admin', 'school_admin', 'teacher'), materialsController.getCommandTerms);
+router.get('/command-terms/file', authorize('student', 'super_admin', 'school_admin', 'teacher'), materialsController.getCommandTermsFile);
+router.get('/command-terms/file/content', authorize('student', 'super_admin', 'school_admin', 'teacher'), materialsController.getCommandTermsFileContent);
+
 // Checklists: list and view content by subject
 router.get('/checklists', authorize('student', 'super_admin', 'school_admin', 'teacher'), materialsController.getChecklists);
+router.get('/checklists/file', authorize('student', 'super_admin', 'school_admin', 'teacher'), materialsController.getChecklistsFile);
 router.get('/checklists/file/content', authorize('student', 'super_admin', 'school_admin', 'teacher'), materialsController.getChecklistsFileContent);
+
+router.get('/ia-guide', authorize('student', 'super_admin', 'school_admin', 'teacher'), materialsController.getIaGuide);
+router.get('/ia-guide/file', authorize('student', 'super_admin', 'school_admin', 'teacher'), materialsController.getIaGuideFile);
 
 router.use(authorize('super_admin'));
 router.get('/file', materialsController.getFile);
