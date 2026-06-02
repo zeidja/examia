@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via webhook (recommended)
+        id: webhook
         if: ${{ secrets.DEPLOY_WEBHOOK_SECRET != '' && secrets.DEPLOY_URL != '' }}
         env:
           DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
@@ -26,12 +27,13 @@ jobs:
           cat /tmp/deploy-response.json
           echo ""
           if [ "$HTTP_CODE" != "202" ] && [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::Webhook deploy failed (HTTP ${HTTP_CODE})"
+            echo "::error::Webhook deploy failed (HTTP ${HTTP_CODE}). Check DEPLOY_WEBHOOK_SECRET on server .env and pm2 restart."
             exit 1
           fi
           echo "Deploy triggered successfully (HTTP ${HTTP_CODE})."
 
-      - name: Deploy via SSH (fallback if webhook secrets are not set)
+      - name: Deploy via SSH (only when webhook secrets are not set)
+        id: ssh
         if: ${{ secrets.DEPLOY_WEBHOOK_SECRET == '' && secrets.DEPLOY_HOST != '' && secrets.DEPLOY_SSH_KEY != '' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -45,16 +47,26 @@ jobs:
             export EXAMIA_DIR=/var/www/examia
             bash $EXAMIA_DIR/deploy/deploy.sh
 
-      - name: Check deploy is configured
-        if: ${{ always() }}
-        env:
-          HAS_WEBHOOK: ${{ secrets.DEPLOY_WEBHOOK_SECRET != '' && secrets.DEPLOY_URL != '' }}
-          HAS_SSH: ${{ secrets.DEPLOY_WEBHOOK_SECRET == '' && secrets.DEPLOY_HOST != '' && secrets.DEPLOY_SSH_KEY != '' }}
+      - name: Verify deploy ran successfully
+        if: always()
         run: |
-          if [ "$HAS_WEBHOOK" = "true" ] || [ "$HAS_SSH" = "true" ]; then
+          WEBHOOK="${{ steps.webhook.outcome }}"
+          SSH="${{ steps.ssh.outcome }}"
+          echo "Deploy step outcomes: webhook=${WEBHOOK}, ssh=${SSH}"
+
+          if [ "$WEBHOOK" = "success" ] || [ "$SSH" = "success" ]; then
+            echo "Deploy completed."
             exit 0
           fi
-          echo "::error::No deploy method configured."
-          echo "Add GitHub secrets DEPLOY_URL + DEPLOY_WEBHOOK_SECRET (recommended),"
-          echo "or DEPLOY_HOST + DEPLOY_USER + DEPLOY_SSH_KEY. See deploy/README.md"
+
+          if [ "$WEBHOOK" = "skipped" ] && [ "$SSH" = "skipped" ]; then
+            echo "::error::Auto-deploy is not configured."
+            echo "Add GitHub Actions secrets:"
+            echo "  DEPLOY_URL + DEPLOY_WEBHOOK_SECRET (recommended), OR"
+            echo "  DEPLOY_HOST + DEPLOY_USER + DEPLOY_SSH_KEY"
+            echo "See deploy/README.md"
+            exit 1
+          fi
+
+          echo "::error::Deploy failed. If SSH times out on port 22, use the webhook method (DEPLOY_URL + DEPLOY_WEBHOOK_SECRET)."
           exit 1

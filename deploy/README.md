@@ -112,12 +112,25 @@ Only works if port **22** is open to [GitHub Actions IP ranges](https://api.gith
 
 Create deploy key and add public key to `~/.ssh/authorized_keys` on the server (same as before). **Do not set** `DEPLOY_WEBHOOK_SECRET` if you want SSH-only; the workflow uses SSH when webhook secrets are empty.
 
+### Push succeeded but the server did not update?
+
+Auto-deploy is **still enabled** on every push to `main`. It does **not** run `deploy.sh` on GitHub’s servers — it only triggers your VPS.
+
+1. Open **GitHub → Actions → Deploy to Server** and open the latest run.
+2. Check which step ran:
+   - **Deploy via webhook** — needs `DEPLOY_URL` + `DEPLOY_WEBHOOK_SECRET` secrets **and** the same secret in server `backend/.env` (one-time `git pull` + `pm2 restart` for the webhook route).
+   - **Deploy via SSH** — often **fails** with `dial tcp …:22: i/o timeout` on Hostinger; switch to webhook.
+   - **Both skipped** — no secrets configured; add webhook secrets (table above).
+3. A green checkmark with **only** “Check deploy is configured” (old workflow) meant secrets existed but SSH never connected — the server was not updated.
+
 ### Troubleshooting
 
 | Error | Fix |
 |--------|-----|
 | `dial tcp …:22: i/o timeout` | Use **Option A (webhook)** or open port 22 to GitHub Actions IPs in Hostinger. |
+| Webhook step skipped | Add `DEPLOY_URL` and `DEPLOY_WEBHOOK_SECRET` in GitHub secrets. |
 | Webhook `401` | `DEPLOY_WEBHOOK_SECRET` must match exactly on server and GitHub. |
+| Webhook `404` | Server code is old; SSH in and `git pull`, `pm2 restart examia-backend`. |
 | Webhook `503` | Set `DEPLOY_WEBHOOK_SECRET` in `/var/www/examia/backend/.env` and `pm2 restart examia-backend`. |
 | Webhook `500` deploy script not found | Run `setup-server.sh` or clone repo to `/var/www/examia`. |
 
