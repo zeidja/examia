@@ -79,6 +79,45 @@ So that every push to `main` updates the server:
 
 4. Push to `main`; the **Deploy to Server** workflow will run and execute `deploy/deploy.sh` on the server (pull, install, build, restart).
 
+### `dial tcp …:22: i/o timeout` (GitHub Actions cannot SSH)
+
+This means **port 22 is blocked** between GitHub’s runners and your VPS. Your laptop SSH can still work while GitHub fails — different source IPs.
+
+**Fix on Hostinger (pick one):**
+
+1. **Open SSH in the VPS firewall (simplest)**  
+   - Hostinger **hPanel** → your VPS → **Security** / **Firewall**  
+   - Add **inbound** rule: **TCP 22**, source **Anywhere** (`0.0.0.0/0`)  
+   - Save, wait 1–2 minutes, re-run the GitHub Actions workflow  
+
+   Rely on **SSH keys only** (no password login). Your `DEPLOY_SSH_KEY` secret is the protection.
+
+2. **Check SSH is running on the server** (SSH in from your PC first):
+
+   ```bash
+   ssh root@187.77.74.33
+   systemctl status ssh
+   ufw status    # if “active”, allow 22: ufw allow 22/tcp && ufw reload
+   ```
+
+3. **Confirm GitHub secrets** (Settings → Secrets → Actions):
+
+   | Secret | Must be |
+   |--------|---------|
+   | `DEPLOY_HOST` | `187.77.74.33` (IP, not a URL) |
+   | `DEPLOY_USER` | `root` (or your SSH user) |
+   | `DEPLOY_SSH_KEY` | Full private key including `-----BEGIN … KEY-----` lines |
+
+4. **Do not whitelist “GitHub IPs” by hand** — GitHub publishes thousands of ranges ([meta API](https://api.github.com/meta)); Hostinger cannot list them all. Use rule (1) or use a **self-hosted runner** on the same VPS.
+
+**Quick test:** After opening port 22, in GitHub go to **Actions → Deploy to Server → Re-run all jobs**. You should see `git pull` / `npm` output instead of `i/o timeout`.
+
+**Until firewall is fixed:** deploy manually:
+
+```bash
+ssh root@187.77.74.33 'cd /var/www/examia && bash deploy/deploy.sh'
+```
+
 ---
 
 ## 3. Manual deploy (optional)
