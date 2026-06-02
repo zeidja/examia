@@ -8,7 +8,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "seed": "node scripts/seed.js",
-    "seed:demo-al-mashrek": "node scripts/seedDemoAlMashrek.js"
+    "seed:demo-al-mashrek": "node scripts/seedDemoAlMashrek.js",
+    "seed:demo-cms": "node scripts/seedDemoCms.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

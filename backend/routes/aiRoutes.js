@@ -18,5 +18,6 @@ router.post('/review-submission', aiController.reviewSubmissionHandler);
 router.post('/review-submission/upload', uploadReviewSubmission, aiController.reviewSubmissionUploadHandler);
 router.post('/study-learn/chat', authorize('student'), aiController.studyLearnChatHandler);
 router.post('/feynman-chat', authorize('student'), aiController.feynmanChatHandler);
+router.post('/speech', authorize('student'), aiController.speechHandler);
 
 export default router;

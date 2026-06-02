@@ -16,6 +16,8 @@ import ideaRoutes from './routes/ideaRoutes.js';
 import insightsRoutes from './routes/insightsRoutes.js';
 import lessonNoteRoutes from './routes/lessonNoteRoutes.js';
 import activityLogRoutes from './routes/activityLogRoutes.js';
+import calendarRoutes from './routes/calendarRoutes.js';
+import iaSamplesRoutes from './routes/iaSamplesRoutes.js';
 import { attachActivityHttpLogger } from './middleware/activityHttpLogger.js';
 
 connectDB();
@@ -47,6 +49,8 @@ app.use('/api/ideas', ideaRoutes);
 app.use('/api/insights', insightsRoutes);
 app.use('/api/lesson-notes', lessonNoteRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/ia-samples', iaSamplesRoutes);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

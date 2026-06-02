@@ -9,9 +9,48 @@ const SUMMARY_CHAR_MAX = 120;
 
 const sectionTransition = { duration: 0.25 };
 
-/** Flip card for a key term: click toggles term / definition. */
-function KeyTermCard({ term, definition, onRemove, canEdit }) {
+const flipCardFace =
+  'absolute inset-0 flex flex-col items-center justify-center rounded-xl border border-examia-soft/40 bg-white p-4 shadow-sm [backface-visibility:hidden]';
+
+/** Key term card: 3D flip in recall mode; simple toggle when editing. */
+function KeyTermCard({ term, definition, onRemove, canEdit, recallMode }) {
   const [flipped, setFlipped] = useState(false);
+
+  if (recallMode) {
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={sectionTransition}
+        className="h-32 [perspective:1000px]"
+      >
+        <button
+          type="button"
+          onClick={() => setFlipped((f) => !f)}
+          className="relative block w-full h-full text-left rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-examia-dark/30"
+          aria-label={flipped ? 'Show term' : 'Show definition'}
+        >
+          <div
+            className={`relative w-full h-full transition-transform duration-500 [transform-style:preserve-3d] ${
+              flipped ? '[transform:rotateY(180deg)]' : ''
+            }`}
+          >
+            <div className={flipCardFace}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-examia-mid mb-1">Term</span>
+              <span className="text-sm font-bold text-examia-dark text-center">{term || '—'}</span>
+              <span className="text-xs text-examia-mid mt-2">Tap to flip</span>
+            </div>
+            <div className={`${flipCardFace} [transform:rotateY(180deg)]`}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-examia-mid mb-1">Definition</span>
+              <span className="text-sm font-medium text-examia-dark text-center line-clamp-4">{definition || '—'}</span>
+            </div>
+          </div>
+        </button>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       layout
@@ -41,6 +80,32 @@ function KeyTermCard({ term, definition, onRemove, canEdit }) {
         </button>
       )}
     </motion.div>
+  );
+}
+
+/** Confidence score on a card (shown during recall mode). */
+function ConfidenceCard({ score, canEdit, onChange, onSave }) {
+  return (
+    <div className="rounded-2xl border border-examia-soft/40 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <p className="text-sm font-semibold text-examia-dark">Confidence</p>
+        <span className="text-2xl font-bold text-examia-dark tabular-nums">{score ?? 0}</span>
+      </div>
+      <div className="flex items-center gap-4">
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={score ?? 0}
+          onChange={(e) => onChange(Number(e.target.value))}
+          onMouseUp={onSave}
+          onTouchEnd={onSave}
+          disabled={!canEdit}
+          className="flex-1 h-3 rounded-full appearance-none bg-examia-soft/30 accent-examia-dark disabled:opacity-60"
+        />
+        <span className="text-xs text-examia-mid shrink-0">0–100</span>
+      </div>
+    </div>
   );
 }
 
@@ -132,7 +197,6 @@ export function LessonStudyPage() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [recallMode, setRecallMode] = useState(false);
-  const [recallStartedAt, setRecallStartedAt] = useState(null);
   const [recallRevealed, setRecallRevealed] = useState(false);
   const [recallRating, setRecallRating] = useState(null);
   const [recallDraft, setRecallDraft] = useState('');
@@ -223,7 +287,6 @@ export function LessonStudyPage() {
     const newScores = [...(note?.recall_scores || []), value];
     updateLocal({ recall_scores: newScores });
     setRecallMode(false);
-    setRecallStartedAt(null);
     setRecallRevealed(false);
     setRecallRating(null);
     setRecallDraft('');
@@ -305,21 +368,35 @@ export function LessonStudyPage() {
           {saving && (
             <span className="text-xs text-examia-mid font-medium">Saving…</span>
           )}
-          {canEdit && !recallMode && (
+          {canEdit && recallMode ? (
             <button
               type="button"
               onClick={() => {
-                setRecallMode(true);
-                setRecallStartedAt(Date.now());
+                setRecallMode(false);
                 setRecallRevealed(false);
                 setRecallRating(null);
                 setRecallDraft('');
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-examia-dark/20 text-examia-dark font-medium hover:bg-examia-dark/5 transition"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-examia-soft/50 text-examia-dark font-medium hover:bg-examia-soft/20 transition"
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-examia-dark" />
-              Recall mode
+              Exit recall
             </button>
+          ) : (
+            canEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRecallMode(true);
+                  setRecallRevealed(false);
+                  setRecallRating(null);
+                  setRecallDraft('');
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-examia-dark/20 text-examia-dark font-medium hover:bg-examia-dark/5 transition"
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-examia-dark" />
+                Recall mode
+              </button>
+            )
           )}
         </div>
       </div>
@@ -333,13 +410,17 @@ export function LessonStudyPage() {
           {!recallRevealed ? (
             <>
               <p className="text-sm text-examia-dark font-medium">
-                Try to recall your notes from memory. Optionally write what you remember below, then reveal and rate yourself.
+                Try to recall your notes from memory. Flip key-term cards, answer self-test questions, then reveal and rate yourself.
               </p>
-              {recallStartedAt && (
-                <p className="text-2xl font-mono font-semibold text-examia-dark">
-                  {Math.floor((Date.now() - recallStartedAt) / 1000)}s
-                </p>
-              )}
+              <ConfidenceCard
+                score={note.confidence_score ?? 0}
+                canEdit={canEdit}
+                onChange={(n) => updateLocal({ confidence_score: n })}
+                onSave={() => {
+                  const current = noteRef.current;
+                  if (current) saveNote({ ...current, confidence_score: current.confidence_score });
+                }}
+              />
               <textarea
                 value={recallDraft}
                 onChange={(e) => setRecallDraft(e.target.value)}
@@ -454,7 +535,7 @@ export function LessonStudyPage() {
         open={sectionOpen.terms}
         onToggle={() => setSectionOpen((s) => ({ ...s, terms: !s.terms }))}
       >
-        {canEdit && (
+        {canEdit && !recallMode && (
           <div className="flex flex-wrap gap-3 mb-4 p-4 rounded-xl bg-examia-soft/10 border border-examia-soft/30">
             <input
               type="text"
@@ -487,15 +568,19 @@ export function LessonStudyPage() {
             </button>
           </div>
         )}
+        {recallMode && (
+          <p className="text-xs text-examia-mid mb-3">Tap a card to flip between term and definition.</p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {keyTerms.map((kt, i) => (
             <KeyTermCard
-              key={i}
+              key={`${i}-${recallMode ? 'recall' : 'edit'}`}
               term={kt.term}
               definition={kt.definition}
-              canEdit={canEdit}
+              recallMode={recallMode}
+              canEdit={canEdit && !recallMode}
               onRemove={
-                canEdit
+                canEdit && !recallMode
                   ? () => {
                       const next = keyTerms.filter((_, j) => j !== i);
                       updateLocal({ key_terms: next });
@@ -520,7 +605,7 @@ export function LessonStudyPage() {
         open={sectionOpen.selfTest}
         onToggle={() => setSectionOpen((s) => ({ ...s, selfTest: !s.selfTest }))}
       >
-        {canEdit && (
+        {canEdit && !recallMode && (
           <div className="flex flex-wrap gap-3 mb-4 p-4 rounded-xl bg-examia-soft/10 border border-examia-soft/30">
             <input
               type="text"
@@ -562,7 +647,7 @@ export function LessonStudyPage() {
               canEdit={canEdit}
               hideAnswer={recallMode}
               onRemove={
-                canEdit
+                canEdit && !recallMode
                   ? () => {
                       const next = selfTest.filter((_, j) => j !== i);
                       updateLocal({ self_test: next });
@@ -577,31 +662,28 @@ export function LessonStudyPage() {
         )}
       </SectionCard>
 
-      <SectionCard
-        title="Confidence (0–100)"
-        icon={
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        }
-        open={sectionOpen.confidence}
-        onToggle={() => setSectionOpen((s) => ({ ...s, confidence: !s.confidence }))}
-      >
-        <div className="flex items-center gap-4">
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={note.confidence_score ?? 0}
-            onChange={(e) => updateLocal({ confidence_score: Number(e.target.value) })}
-            onMouseUp={() => saveNote({ ...note, confidence_score: note.confidence_score })}
-            onTouchEnd={() => saveNote({ ...note, confidence_score: note.confidence_score })}
-            disabled={!canEdit}
-            className="flex-1 h-3 rounded-full appearance-none bg-examia-soft/30 accent-examia-dark disabled:opacity-60"
+      {!recallMode && (
+        <SectionCard
+          title="Confidence (0–100)"
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          }
+          open={sectionOpen.confidence}
+          onToggle={() => setSectionOpen((s) => ({ ...s, confidence: !s.confidence }))}
+        >
+          <ConfidenceCard
+            score={note.confidence_score ?? 0}
+            canEdit={canEdit}
+            onChange={(n) => updateLocal({ confidence_score: n })}
+            onSave={() => {
+              const current = noteRef.current;
+              if (current) saveNote({ ...current, confidence_score: current.confidence_score });
+            }}
           />
-          <span className="text-lg font-semibold text-examia-dark w-12 text-right">{note.confidence_score ?? 0}</span>
-        </div>
-      </SectionCard>
+        </SectionCard>
+      )}
     </motion.section>
   );
 }

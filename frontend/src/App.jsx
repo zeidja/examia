@@ -29,6 +29,7 @@ import {
   SubjectCommandTerms,
   SubjectChecklists,
   SubjectIaGuide,
+  SubjectIaSamples,
   ComingSoonPage,
 } from './pages/dashboard/SubjectContentTabs';
 import { SubjectInsights } from './pages/dashboard/SubjectInsights';
@@ -99,6 +100,7 @@ function AppRoutes() {
           <Route path="feynman" element={<SubjectFeynman />} />
           <Route path="feedback" element={<SubjectFeedback />} />
           <Route path="ia-guide" element={<SubjectIaGuide />} />
+          <Route path="ia-samples" element={<SubjectIaSamples />} />
         </Route>
         <Route path="content/:id" element={<ContentView />} />
         <Route path="resources" element={<TeacherResources />} />

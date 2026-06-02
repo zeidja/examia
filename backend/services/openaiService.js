@@ -576,3 +576,22 @@ export async function feynmanChat(messages, subjectName = '', resourcesContext =
   });
   return completion.choices?.[0]?.message?.content ?? '';
 }
+
+const TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'tts-1-hd';
+const TTS_VOICE = process.env.OPENAI_TTS_VOICE || 'nova';
+const TTS_MAX_CHARS = 4096;
+
+/** Natural speech (OpenAI TTS) for Teach & Learn voice calls. */
+export async function synthesizeSpeech(text) {
+  const input = String(text || '').trim().slice(0, TTS_MAX_CHARS);
+  if (!input) throw new Error('Text is required for speech');
+  if (!process.env.OPENAI_API_KEY) throw new Error('OpenAI API key is not configured');
+
+  const response = await openai.audio.speech.create({
+    model: TTS_MODEL,
+    voice: TTS_VOICE,
+    input,
+    response_format: 'mp3',
+  });
+  return Buffer.from(await response.arrayBuffer());
+}

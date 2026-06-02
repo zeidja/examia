@@ -160,13 +160,17 @@ export function SubjectNotesList() {
                 <p className="text-xs text-examia-mid mt-1">
                   Updated {note.updatedAt ? new Date(note.updatedAt).toLocaleDateString() : '—'}
                 </p>
-                <div className="mt-3 flex items-center gap-2 text-sm text-examia-mid">
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-examia-mid">
                   <span>{Array.isArray(note.summary) ? note.summary.filter(Boolean).length : 0}/5 summary</span>
                   <span>·</span>
                   <span>{Array.isArray(note.key_terms) ? note.key_terms.length : 0} terms</span>
                   <span>·</span>
                   <span>{Array.isArray(note.self_test) ? note.self_test.length : 0} Q&amp;A</span>
                 </div>
+                <p className="mt-2 text-sm font-semibold text-examia-dark">
+                  Confidence: {note.confidence_score ?? 0}
+                  <span className="font-normal text-examia-mid"> / 100</span>
+                </p>
                 <span className="inline-flex items-center gap-1 mt-3 text-xs font-medium text-examia-dark group-hover:translate-x-0.5 transition-transform">
                   Open
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

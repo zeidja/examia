@@ -1,10 +1,10 @@
 /**
- * Demo data for testers: school "Al Mashrek", school admin, one teacher per active subject,
+ * Demo data for testers: school "CMS", school admin, one teacher per active subject,
  * two classes with five students each. All logins use password Demo12@.
  *
  * Prerequisite: run `npm run seed` once so Subject documents exist (synced from materials).
  *
- * Usage: npm run seed:demo-al-mashrek
+ * Usage: npm run seed:demo-cms
  */
 import 'dotenv/config';
 import path from 'path';
@@ -14,13 +14,13 @@ import { seedDemoSchool } from './lib/seedDemoSchool.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 seedDemoSchool({
-  schoolName: 'Al Mashrek',
-  emailDomain: 'mashrek.edu',
-  emailKeyword: 'mashrek',
-  adminDisplayName: 'Al Mashrek — School admin',
-  markdownTitle: 'Al Mashrek demo accounts',
-  markdownFilename: 'demo-al-mashrek-accounts.md',
-  npmScript: 'seed:demo-al-mashrek',
+  schoolName: 'CMS',
+  emailDomain: 'cms.edu',
+  emailKeyword: 'cms',
+  adminDisplayName: 'CMS — School admin',
+  markdownTitle: 'CMS demo accounts',
+  markdownFilename: 'demo-cms-accounts.md',
+  npmScript: 'seed:demo-cms',
   scriptsDir: __dirname,
 }).catch((e) => {
   console.error(e);

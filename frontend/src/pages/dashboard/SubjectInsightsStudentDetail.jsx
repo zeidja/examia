@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useOutletContext, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
-import { stripDuplicateMcqLetterPrefix } from '../../utils/format';
+import { groupWrongAnswersByQuiz, wrongAnswerItemKey } from '../../utils/insights';
+import { WrongAnswerQuestionDetail } from '../../components/insights/WrongAnswerQuestionDetail';
 
 /** Teacher-only: detailed view for one student in a subject — quiz attempts, flashcard breakdown, wrong answers, hard cards. */
 export function SubjectInsightsStudentDetail() {
@@ -11,6 +12,7 @@ export function SubjectInsightsStudentDetail() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expandedQuizzes, setExpandedQuizzes] = useState(new Set());
   const [expandedWrong, setExpandedWrong] = useState(new Set());
 
   useEffect(() => {
@@ -24,11 +26,23 @@ export function SubjectInsightsStudentDetail() {
       .finally(() => setLoading(false));
   }, [subjectId, studentId]);
 
-  const toggleWrong = (i) => {
+  const wrongAnswerBank = data?.wrongAnswerBank ?? [];
+  const wrongByQuiz = useMemo(() => groupWrongAnswersByQuiz(wrongAnswerBank), [wrongAnswerBank]);
+
+  const toggleQuiz = (resourceId) => {
+    setExpandedQuizzes((prev) => {
+      const next = new Set(prev);
+      if (next.has(resourceId)) next.delete(resourceId);
+      else next.add(resourceId);
+      return next;
+    });
+  };
+
+  const toggleWrong = (key) => {
     setExpandedWrong((prev) => {
       const next = new Set(prev);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -59,7 +73,7 @@ export function SubjectInsightsStudentDetail() {
     );
   }
 
-  const { student, quizAttempts = [], wrongAnswerBank = [], flashcardSummary = {} } = data;
+  const { student, quizAttempts = [], flashcardSummary = {} } = data;
   const { easy: flashEasy = 0, medium: flashMedium = 0, hard: flashHard = 0, total: flashTotal = 0, byResource: flashByResource = [], hardRatedCards = [] } = flashcardSummary;
   const quizAvgPct = quizAttempts.length > 0 ? Math.round(quizAttempts.reduce((s, q) => s + (q.pct || 0), 0) / quizAttempts.length) : null;
 
@@ -182,33 +196,54 @@ export function SubjectInsightsStudentDetail() {
           <p className="text-examia-mid text-sm">No wrong answers recorded yet.</p>
         ) : (
           <div className="space-y-3">
-            {wrongAnswerBank.map((w, i) => (
-              <div key={i} className="rounded-xl border border-examia-soft/40 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => toggleWrong(i)}
-                  className="w-full text-left px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-examia-soft/5 hover:bg-examia-soft/10"
-                >
-                  <span className="font-medium text-examia-dark line-clamp-1">{w.resourceTitle} — Q{w.questionIndex + 1}</span>
-                  <span className="text-sm text-examia-mid">{expandedWrong.has(i) ? 'Hide' : 'Show'}</span>
-                </button>
-                {expandedWrong.has(i) && (
-                  <div className="px-4 py-3 border-t border-examia-soft/30 space-y-2 text-sm">
-                    <p className="font-medium text-examia-dark">{w.questionText}</p>
-                    {w.options?.length > 0 && (
-                      <div className="space-y-1">
-                        {w.options.map((opt, j) => (
-                          <p key={j} className={j === w.correctIndex ? 'text-emerald-700 font-medium' : j === w.selectedIndex ? 'text-rose-700' : 'text-examia-mid'}>
-                            {j === w.correctIndex && '✓ '}{j === w.selectedIndex && '✗ '}{String.fromCharCode(65 + j)}. {stripDuplicateMcqLetterPrefix(opt, j)}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                    {w.rationale && <p className="text-examia-mid italic mt-2">{w.rationale}</p>}
-                  </div>
-                )}
-              </div>
-            ))}
+            {wrongByQuiz.map((quiz) => {
+              const quizOpen = expandedQuizzes.has(quiz.resourceId);
+              return (
+                <div key={quiz.resourceId} className="rounded-xl border border-examia-soft/40 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleQuiz(quiz.resourceId)}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left bg-examia-soft/10 hover:bg-examia-soft/20 transition-colors"
+                  >
+                    <span className="font-semibold text-examia-dark truncate flex-1 min-w-0">{quiz.title}</span>
+                    <span className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200/80 px-2.5 py-1 rounded-full shrink-0">
+                      {quiz.items.length} wrong
+                    </span>
+                    <svg
+                      className={`w-5 h-5 text-examia-mid shrink-0 transition-transform ${quizOpen ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {quizOpen && (
+                    <div className="border-t border-examia-soft/30 bg-white divide-y divide-examia-soft/20">
+                      {quiz.items.map((w) => {
+                        const itemKey = wrongAnswerItemKey(w);
+                        const open = expandedWrong.has(itemKey);
+                        return (
+                          <div key={itemKey} className="overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => toggleWrong(itemKey)}
+                              className="w-full text-left px-4 py-3 flex flex-wrap items-center justify-between gap-2 hover:bg-examia-soft/5"
+                            >
+                              <span className="font-medium text-examia-dark line-clamp-2 text-sm flex-1 min-w-0">
+                                Q{w.questionIndex + 1}: {w.questionText || 'Question'}
+                              </span>
+                              <span className="text-sm text-examia-mid shrink-0">{open ? 'Hide' : 'Show'}</span>
+                            </button>
+                            {open && <WrongAnswerQuestionDetail item={w} />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

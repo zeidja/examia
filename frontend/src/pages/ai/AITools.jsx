@@ -219,18 +219,21 @@ function QuizEditor({ data, onChange }) {
                 <label className="block text-xs font-medium text-examia-mid mb-2">Answer options</label>
                 <div className="space-y-2">
                   {(q.options || []).map((opt, j) => (
-                    <div key={j} className="flex items-center gap-2">
-                      <span className="shrink-0 w-6 h-6 rounded-full bg-examia-soft/40 flex items-center justify-center text-xs font-medium text-examia-dark">
+                    <div
+                      key={j}
+                      className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto_auto] sm:grid-cols-[1.5rem_minmax(0,1fr)_5.5rem_2rem] gap-2 items-center"
+                    >
+                      <span className="w-6 h-6 rounded-full bg-examia-soft/40 flex items-center justify-center text-xs font-medium text-examia-dark justify-self-center">
                         {String.fromCharCode(65 + j)}
                       </span>
                       <input
                         type="text"
                         value={opt}
                         onChange={(e) => updateOption(i, j, e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark text-sm placeholder:text-examia-mid focus:ring-2 focus:ring-examia-mid/30 focus:border-examia-mid"
+                        className="min-w-0 w-full px-3 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark text-sm placeholder:text-examia-mid focus:ring-2 focus:ring-examia-mid/30 focus:border-examia-mid"
                         placeholder={`Option ${String.fromCharCode(65 + j)}`}
                       />
-                      <label className="flex items-center gap-1.5 shrink-0 cursor-pointer">
+                      <label className="flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
                         <input
                           type="radio"
                           name={`correct-${i}`}
@@ -240,15 +243,17 @@ function QuizEditor({ data, onChange }) {
                         />
                         <span className="text-xs text-examia-mid">Correct</span>
                       </label>
-                      {(q.options || []).length > 2 && (
+                      {(q.options || []).length > 2 ? (
                         <button
                           type="button"
                           onClick={() => removeOption(i, j)}
-                          className="text-xs text-red-600 hover:text-red-700 p-1"
+                          className="w-8 h-8 flex items-center justify-center text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg justify-self-end"
                           title="Remove option"
                         >
                           ×
                         </button>
+                      ) : (
+                        <span className="w-8" aria-hidden />
                       )}
                     </div>
                   ))}
@@ -700,23 +705,33 @@ export function AITools() {
             )}
 
             {showSaveOption && (
-              <form onSubmit={handleSaveResource} className="p-4 rounded-xl bg-examia-soft/20 border border-examia-soft/50 space-y-3">
-                <h4 className="font-medium text-examia-dark">Assign to class(es) & save</h4>
-                <p className="text-sm text-examia-dark">
-                  {activeTab === 'quizzes'
-                    ? 'Title, at least one class, start time, and end time are required before saving. Then publish from Library when ready.'
-                    : 'Title and at least one class are required. Then publish from Library when ready.'}
-                </p>
-                <div className="flex flex-wrap gap-3 items-start">
-                  <input
-                    required
-                    placeholder="Title (e.g. Cell division quiz)"
-                    value={saveForm.title}
-                    onChange={(e) => setSaveForm((f) => ({ ...f, title: e.target.value }))}
-                    className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark flex-1 min-w-[200px]"
-                  />
-                  <div className="w-full min-w-[220px] max-w-md space-y-1">
-                    <span className="text-sm font-medium text-examia-dark block mb-1">Classes <span className="text-red-600">*</span></span>
+              <form onSubmit={handleSaveResource} className="p-4 rounded-xl bg-examia-soft/20 border border-examia-soft/50 space-y-4">
+                <div>
+                  <h4 className="font-medium text-examia-dark">Assign to class(es) & save</h4>
+                  <p className="text-sm text-examia-mid mt-1">
+                    {activeTab === 'quizzes'
+                      ? 'Title, at least one class, start time, and end time are required before saving. Then publish from Library when ready.'
+                      : 'Title and at least one class are required. Then publish from Library when ready.'}
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label htmlFor="save-resource-title" className="text-xs font-medium text-examia-dark block mb-1.5">
+                      Title <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      id="save-resource-title"
+                      required
+                      placeholder="e.g. Cell division quiz"
+                      value={saveForm.title}
+                      onChange={(e) => setSaveForm((f) => ({ ...f, title: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark text-sm"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-examia-dark block mb-1.5">
+                      Classes <span className="text-red-600">*</span>
+                    </span>
                     <ClassMultiSelectDropdown
                       classes={classes}
                       selectedIds={saveForm.classIds}
@@ -725,51 +740,75 @@ export function AITools() {
                       emptyMessage="No classes loaded."
                     />
                   </div>
-                  {activeTab === 'quizzes' && (
-                    <>
-                      <div className="flex flex-col gap-0.5">
-                        <label className="text-xs font-medium text-examia-dark">
+                  {activeTab === 'quizzes' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                      <div className="min-w-0">
+                        <label htmlFor="save-quiz-start" className="text-xs font-medium text-examia-dark block mb-1.5">
                           Start <span className="text-red-600">*</span>
                         </label>
                         <input
+                          id="save-quiz-start"
                           type="datetime-local"
                           required
                           title="Students can attempt from this date/time"
                           value={saveForm.availabilityStart}
                           onChange={(e) => setSaveForm((f) => ({ ...f, availabilityStart: e.target.value }))}
-                          className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark"
+                          className="w-full min-w-0 px-3 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark text-sm"
                         />
                       </div>
-                      <div className="flex flex-col gap-0.5">
-                        <label className="text-xs font-medium text-examia-dark">
+                      <div className="min-w-0">
+                        <label htmlFor="save-quiz-end" className="text-xs font-medium text-examia-dark block mb-1.5">
                           End <span className="text-red-600">*</span>
                         </label>
                         <input
+                          id="save-quiz-end"
                           type="datetime-local"
                           required
                           title="Students cannot attempt after this date/time"
                           value={saveForm.deadline}
                           onChange={(e) => setSaveForm((f) => ({ ...f, deadline: e.target.value }))}
-                          className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark"
+                          className="w-full min-w-0 px-3 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark text-sm"
                         />
                       </div>
-                    </>
+                      <div className="min-w-0">
+                        <label htmlFor="save-quiz-time-limit" className="text-xs font-medium text-examia-dark block mb-1.5">
+                          Time limit (min)
+                        </label>
+                        <input
+                          id="save-quiz-time-limit"
+                          type="number"
+                          min={1}
+                          placeholder="Optional"
+                          value={saveForm.timeLimitMinutes}
+                          onChange={(e) => setSaveForm((f) => ({ ...f, timeLimitMinutes: e.target.value }))}
+                          className="w-full min-w-0 px-3 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark text-sm"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="w-full lg:w-auto px-5 py-2 rounded-lg bg-examia-dark text-white text-sm font-medium hover:bg-examia-mid disabled:opacity-60 transition shrink-0"
+                      >
+                        {saving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="px-5 py-2 rounded-lg bg-examia-dark text-white text-sm font-medium hover:bg-examia-mid disabled:opacity-60 transition"
+                      >
+                        {saving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
                   )}
-                  {activeTab === 'quizzes' && (
-                    <input
-                      type="number"
-                      min={1}
-                      placeholder="Time limit (min)"
-                      value={saveForm.timeLimitMinutes}
-                      onChange={(e) => setSaveForm((f) => ({ ...f, timeLimitMinutes: e.target.value }))}
-                      className="px-4 py-2 rounded-lg border border-examia-soft/50 bg-white text-examia-dark w-32"
-                    />
-                  )}
-                  <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg bg-examia-dark text-white font-medium disabled:opacity-60">
-                    {saving ? 'Saving…' : 'Save'}
-                  </button>
                 </div>
-                {saved && <p className="text-sm text-examia-dark">Saved. Go to <Link to="/resources" className="font-medium underline">Library</Link> to publish it for students.</p>}
+                {saved && (
+                  <p className="text-sm text-examia-dark">
+                    Saved. Go to <Link to="/resources" className="font-medium underline">Library</Link> to publish it for students.
+                  </p>
+                )}
               </form>
             )}
           </motion.div>

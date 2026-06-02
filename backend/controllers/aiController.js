@@ -9,6 +9,7 @@ import {
   reviewSubmission,
   studyLearnChat,
   feynmanChat,
+  synthesizeSpeech,
 } from '../services/openaiService.js';
 import { getSubjectPaths, getMaterialFileContent, getSubjectMaterialsText, getMaterialsTextByPaths } from '../services/materialsService.js';
 import Subject from '../models/Subject.js';
@@ -352,17 +353,43 @@ export const studyLearnChatHandler = async (req, res) => {
   }
 };
 
+/** POST /ai/speech — student-only; natural TTS for Teach & Learn voice call (OpenAI). */
+export const speechHandler = async (req, res) => {
+  try {
+    const text = req.body?.text;
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ success: false, message: 'text is required' });
+    }
+    const audio = await synthesizeSpeech(text);
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.send(audio);
+  } catch (err) {
+    console.error('[TTS]', err.message);
+    res.status(500).json({ success: false, message: err.message || 'Speech synthesis failed' });
+  }
+};
+
 /** POST /ai/feynman-chat — student-only; Guided Feynman Class: student teaches, AI asks questions then evaluates. */
 export const feynmanChatHandler = async (req, res) => {
   try {
-    const { subjectId, messages } = req.body;
+    const { subjectId, messages, selectedMaterialPaths } = req.body;
     if (!subjectId || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ success: false, message: 'subjectId and non-empty messages array are required' });
     }
     const subject = await Subject.findById(subjectId).lean();
     if (!subject) return res.status(404).json({ success: false, message: 'Subject not found' });
     const subjectName = subject.name || '';
-    const resourcesContext = await getResourcesContext(subjectName);
+    let resourcesContext;
+    if (Array.isArray(selectedMaterialPaths) && selectedMaterialPaths.length > 0) {
+      resourcesContext = await getMaterialsTextByPaths(selectedMaterialPaths);
+    } else {
+      const folderKey = (subject.materialsPath && subject.materialsPath.trim()) || subjectName;
+      resourcesContext = await getSubjectMaterialsText(folderKey);
+    }
+    if (!resourcesContext || !resourcesContext.trim()) {
+      console.warn(`[Teach & Learn] No materials text for subject "${subjectName}". Select files or check materials folder.`);
+    }
     const reply = await feynmanChat(messages, subjectName, resourcesContext);
     res.json({ success: true, reply });
   } catch (err) {

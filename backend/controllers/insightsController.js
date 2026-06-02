@@ -9,6 +9,11 @@ import {
   assertTeacherCanViewStudent,
   getVisibleStudentIdsForTeacher,
 } from '../utils/teacherClassAccess.js';
+import {
+  getClassmateStudentIds,
+  buildQuizQuestionStatsFromAttempts,
+  getQuestionStats,
+} from '../utils/quizQuestionStats.js';
 
 function isValidObjectId(id) {
   return id && typeof id === 'string' && mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === id;
@@ -48,7 +53,9 @@ export const getSubjectInsights = async (req, res) => {
     const quizIds = quizResources.map((r) => r._id);
     const flashCardIds = flashCardResources.map((r) => r._id);
 
-    const [attempts, allRatings] = await Promise.all([
+    const classmateIds = schoolId ? await getClassmateStudentIds(schoolId, classId) : [];
+
+    const [attempts, allRatings, classQuizAttempts] = await Promise.all([
       quizIds.length > 0
         ? QuizAttempt.find({ resource: { $in: quizIds }, student: req.user._id })
             .populate('resource', 'title type')
@@ -57,7 +64,12 @@ export const getSubjectInsights = async (req, res) => {
       flashCardIds.length > 0
         ? FlashCardRating.find({ resource: { $in: flashCardIds }, student: req.user._id }).lean()
         : [],
+      quizIds.length > 0 && classmateIds.length > 0
+        ? QuizAttempt.find({ resource: { $in: quizIds }, student: { $in: classmateIds } }).lean()
+        : [],
     ]);
+
+    const quizQuestionStats = buildQuizQuestionStatsFromAttempts(classQuizAttempts);
 
     const resourceTitleById = {};
     resources.forEach((r) => { resourceTitleById[r._id.toString()] = r.title; });
@@ -83,6 +95,7 @@ export const getSubjectInsights = async (req, res) => {
         totalQuestions: results.length,
       });
       wrong.forEach((r) => {
+        const qStats = getQuestionStats(quizQuestionStats, rid, r.questionIndex);
         wrongAnswerBank.push({
           resourceId: rid,
           resourceTitle: title,
@@ -92,6 +105,8 @@ export const getSubjectInsights = async (req, res) => {
           correctIndex: r.correctIndex,
           selectedIndex: r.selectedIndex,
           rationale: r.rationale || '',
+          optionPercents: qStats?.optionPercents ?? null,
+          classAttemptCount: qStats?.totalAttempts ?? 0,
         });
       });
     });
@@ -127,6 +142,7 @@ export const getSubjectInsights = async (req, res) => {
       totalQuizMaxScore: totalMaxScore,
       flashCardSummary,
       wrongAnswerBank,
+      quizQuestionStats,
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message || 'Failed to load insights' });
@@ -301,14 +317,23 @@ export const getTeacherStudentDetail = async (req, res) => {
     const resourceTitleById = {};
     resources.forEach((r) => { resourceTitleById[r._id.toString()] = r.title; });
 
-    const [student, attempts, allRatings] = await Promise.all([
-      User.findById(studentId).select('name').lean(),
-      quizIds.length > 0 ? QuizAttempt.find({ resource: { $in: quizIds }, student: studentId }).populate('resource', 'title').lean() : [],
-      flashCardIds.length > 0 ? FlashCardRating.find({ resource: { $in: flashCardIds }, student: studentId }).lean() : [],
-    ]);
+    const student = await User.findById(studentId).select('name school class').lean();
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found' });
     }
+    const studentSchoolId = student.school?._id || student.school;
+    const studentClassId = student.class?._id || student.class;
+    const classmateIds = studentSchoolId ? await getClassmateStudentIds(studentSchoolId, studentClassId) : [];
+
+    const [attempts, allRatings, classQuizAttempts] = await Promise.all([
+      quizIds.length > 0 ? QuizAttempt.find({ resource: { $in: quizIds }, student: studentId }).populate('resource', 'title').lean() : [],
+      flashCardIds.length > 0 ? FlashCardRating.find({ resource: { $in: flashCardIds }, student: studentId }).lean() : [],
+      quizIds.length > 0 && classmateIds.length > 0
+        ? QuizAttempt.find({ resource: { $in: quizIds }, student: { $in: classmateIds } }).lean()
+        : [],
+    ]);
+
+    const quizQuestionStats = buildQuizQuestionStatsFromAttempts(classQuizAttempts);
 
     const wrongAnswerBank = [];
     const quizAttempts = attempts.map((a) => {
@@ -317,6 +342,7 @@ export const getTeacherStudentDetail = async (req, res) => {
       const results = a.results || [];
       results.forEach((r) => {
         if (r.selectedIndex >= 0 && r.selectedIndex !== r.correctIndex) {
+          const qStats = getQuestionStats(quizQuestionStats, rid, r.questionIndex);
           wrongAnswerBank.push({
             resourceId: rid,
             resourceTitle: title,
@@ -326,6 +352,8 @@ export const getTeacherStudentDetail = async (req, res) => {
             correctIndex: r.correctIndex,
             selectedIndex: r.selectedIndex,
             rationale: r.rationale || '',
+            optionPercents: qStats?.optionPercents ?? null,
+            classAttemptCount: qStats?.totalAttempts ?? 0,
           });
         }
       });

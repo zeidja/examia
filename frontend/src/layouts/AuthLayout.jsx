@@ -17,13 +17,13 @@ export function AuthLayout() {
         </div>
         <div className="max-w-md">
           <h1 className="text-3xl xl:text-4xl font-bold text-white tracking-tight leading-tight mb-5">
-            The IB Mastery System
+            The IB Mastery Curriculum
           </h1>
           <p className="text-examia-soft text-base xl:text-lg leading-relaxed">
             Built for IB students to master, and teachers to lead.
           </p>
         </div>
-        <p className="text-examia-soft/70 text-sm">© Examia. For schools using the IB system.</p>
+        <p className="text-examia-soft/70 text-sm">© Examia. For schools using the IB curriculum.</p>
       </motion.div>
       <motion.div
         className="flex-1 flex items-center justify-center p-6 sm:p-10 lg:p-12 bg-examia-bg"

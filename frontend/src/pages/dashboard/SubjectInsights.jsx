@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useOutletContext, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import { stripDuplicateMcqLetterPrefix } from '../../utils/format';
+import { groupWrongAnswersByQuiz, wrongAnswerItemKey } from '../../utils/insights';
+import { WrongAnswerQuestionDetail } from '../../components/insights/WrongAnswerQuestionDetail';
+import { QuizWrongAnswerRecall } from '../../components/insights/QuizWrongAnswerRecall';
 
 const TEACHER_ROLES = ['teacher', 'school_admin', 'super_admin'];
 
@@ -204,8 +206,9 @@ export function SubjectInsights() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expandedQuizzes, setExpandedQuizzes] = useState(new Set());
   const [expandedWrong, setExpandedWrong] = useState(new Set());
-  const [recallActive, setRecallActive] = useState(false);
+  const [recallQuizId, setRecallQuizId] = useState(null);
   const [recallIndex, setRecallIndex] = useState(0);
   const [recallSelected, setRecallSelected] = useState(null);
   const [recallRevealed, setRecallRevealed] = useState(false);
@@ -222,11 +225,38 @@ export function SubjectInsights() {
       .finally(() => setLoading(false));
   }, [subjectId, isTeacherView]);
 
-  const toggleWrong = (i) => {
+  const wrongAnswerBank = data?.wrongAnswerBank ?? [];
+  const wrongByQuiz = useMemo(() => groupWrongAnswersByQuiz(wrongAnswerBank), [wrongAnswerBank]);
+
+  const startRecall = (resourceId) => {
+    setRecallQuizId(resourceId);
+    setRecallIndex(0);
+    setRecallSelected(null);
+    setRecallRevealed(false);
+    setExpandedQuizzes((prev) => new Set(prev).add(resourceId));
+  };
+
+  const exitRecall = () => {
+    setRecallQuizId(null);
+    setRecallIndex(0);
+    setRecallSelected(null);
+    setRecallRevealed(false);
+  };
+
+  const toggleQuiz = (resourceId) => {
+    setExpandedQuizzes((prev) => {
+      const next = new Set(prev);
+      if (next.has(resourceId)) next.delete(resourceId);
+      else next.add(resourceId);
+      return next;
+    });
+  };
+
+  const toggleWrong = (key) => {
     setExpandedWrong((prev) => {
       const next = new Set(prev);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -252,7 +282,7 @@ export function SubjectInsights() {
     return <TeacherInsightsView subjectId={subjectId} subject={subject} data={data} />;
   }
 
-  const { quizSummary = [], totalQuizScore = 0, totalQuizMaxScore = 0, flashCardSummary = {}, wrongAnswerBank = [] } = data || {};
+  const { quizSummary = [], totalQuizScore = 0, totalQuizMaxScore = 0, flashCardSummary = {} } = data || {};
   const { byResource: flashByResource = [], totalEasy = 0, totalMedium = 0, totalHard = 0 } = flashCardSummary;
   const totalFlash = totalEasy + totalMedium + totalHard;
   const quizPct = totalQuizMaxScore > 0 ? Math.round((totalQuizScore / totalQuizMaxScore) * 100) : 0;
@@ -382,157 +412,101 @@ export function SubjectInsights() {
           </span>
           Wrong answer bank
         </h3>
-        <p className="text-examia-mid text-sm mb-4">All questions you got wrong in this subject. Review them to strengthen weak points.</p>
-        {wrongAnswerBank.length > 0 && !recallActive && (
-          <div className="mb-4">
-            <button
-              type="button"
-              onClick={() => { setRecallActive(true); setRecallIndex(0); setRecallSelected(null); setRecallRevealed(false); }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-examia-dark text-white font-medium hover:bg-examia-mid transition shadow-sm"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              Recall — answer this bank again
-            </button>
-          </div>
-        )}
-        {recallActive && wrongAnswerBank.length > 0 ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-examia-mid">Question {recallIndex + 1} of {wrongAnswerBank.length}</p>
-              <button
-                type="button"
-                onClick={() => { setRecallActive(false); setRecallIndex(0); setRecallSelected(null); setRecallRevealed(false); }}
-                className="text-sm text-examia-mid hover:text-examia-dark font-medium"
-              >
-                Exit recall
-              </button>
-            </div>
-            {(() => {
-              const item = wrongAnswerBank[recallIndex];
-              const options = item?.options || [];
-              const correctIndex = item?.correctIndex ?? 0;
-              const isCorrect = recallSelected !== null && recallSelected === correctIndex;
-              return (
-                <div className="p-5 rounded-xl border-2 border-examia-soft/40 bg-examia-soft/5">
-                  <p className="font-medium text-examia-dark mb-4">{item?.questionText || 'Question'}</p>
-                  {!recallRevealed ? (
-                    <div className="space-y-2">
-                      {options.map((opt, j) => (
-                        <button
-                          key={j}
-                          type="button"
-                          onClick={() => { setRecallSelected(j); setRecallRevealed(true); }}
-                          className="w-full text-left px-4 py-3 rounded-xl border-2 border-examia-soft/50 bg-white hover:border-examia-mid hover:bg-examia-soft/20 transition font-medium text-examia-dark"
-                        >
-                          {String.fromCharCode(65 + j)}. {stripDuplicateMcqLetterPrefix(opt, j)}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap gap-2">
-                        {options.map((opt, j) => (
-                          <span
-                            key={j}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium ${
-                              j === correctIndex ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : j === recallSelected ? 'bg-rose-100 text-rose-800 border border-rose-200' : 'bg-examia-soft/20 text-examia-dark border border-examia-soft/40'
-                            }`}
-                          >
-                            {String.fromCharCode(65 + j)}. {stripDuplicateMcqLetterPrefix(opt, j)} {j === correctIndex && ' ✓'}
-                          </span>
-                        ))}
-                      </div>
-                      <p className={`text-sm font-semibold ${isCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
-                        {isCorrect ? 'Correct!' : 'Incorrect. Correct answer: ' + (stripDuplicateMcqLetterPrefix(options[correctIndex] ?? '', correctIndex) || '—')}
-                      </p>
-                      {item?.rationale && (
-                        <p className="text-sm text-examia-dark pt-2 border-t border-examia-soft/30">{item.rationale}</p>
-                      )}
-                      <div className="pt-3 flex justify-end">
-                        {recallIndex < wrongAnswerBank.length - 1 ? (
-                          <button
-                            type="button"
-                            onClick={() => { setRecallIndex((i) => i + 1); setRecallSelected(null); setRecallRevealed(false); }}
-                            className="px-4 py-2 rounded-xl bg-examia-dark text-white font-medium hover:bg-examia-mid transition"
-                          >
-                            Next question
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => { setRecallActive(false); setRecallIndex(0); setRecallSelected(null); setRecallRevealed(false); }}
-                            className="px-4 py-2 rounded-xl bg-examia-dark text-white font-medium hover:bg-examia-mid transition"
-                          >
-                            Back to bank
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-        ) : wrongAnswerBank.length === 0 ? (
+        <p className="text-examia-mid text-sm mb-4">
+          Quizzes where you had wrong answers. Use Recall on a quiz to practice, or expand questions to review.
+        </p>
+        {wrongAnswerBank.length === 0 ? (
           <p className="text-examia-mid text-sm py-4 rounded-xl bg-examia-soft/10 border border-examia-soft/30 text-center">No wrong answers yet. Attempt quizzes to build your bank.</p>
         ) : (
           <div className="space-y-3">
-            {wrongAnswerBank.map((item, i) => {
-              const open = expandedWrong.has(i);
-              const correctOption =
-                item.options && item.options[item.correctIndex] != null
-                  ? stripDuplicateMcqLetterPrefix(item.options[item.correctIndex], item.correctIndex)
-                  : '';
-              const selectedOption =
-                item.selectedIndex >= 0 && item.options && item.options[item.selectedIndex] != null
-                  ? stripDuplicateMcqLetterPrefix(item.options[item.selectedIndex], item.selectedIndex)
-                  : '(not answered)';
+            {wrongByQuiz.map((quiz) => {
+              const quizOpen = expandedQuizzes.has(quiz.resourceId);
+              const inRecall = recallQuizId === quiz.resourceId;
               return (
-                <div
-                  key={`${item.resourceId}-${item.questionIndex}-${i}`}
-                  className="rounded-xl border border-examia-soft/40 overflow-hidden"
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleWrong(i)}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left bg-examia-soft/5 hover:bg-examia-soft/15 transition-colors"
-                  >
-                    <span className="font-medium text-examia-dark line-clamp-2 flex-1 min-w-0">Q: {item.questionText || 'Question'}</span>
-                    <span className="text-xs text-examia-mid shrink-0">{item.resourceTitle}</span>
-                    <svg className={`w-5 h-5 text-examia-mid shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
-                  {open && (
-                    <div className="px-4 pb-4 pt-1 border-t border-examia-soft/30 space-y-3">
-                      <div>
-                        <p className="text-xs font-semibold text-examia-mid uppercase tracking-wider mb-1">Your answer</p>
-                        <p className="text-sm text-rose-700 font-medium">{selectedOption || '—'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-examia-mid uppercase tracking-wider mb-1">Correct answer</p>
-                        <p className="text-sm text-emerald-700 font-medium">{correctOption || '—'}</p>
-                      </div>
-                      {item.rationale && (
-                        <div>
-                          <p className="text-xs font-semibold text-examia-mid uppercase tracking-wider mb-1">Explanation</p>
-                          <p className="text-sm text-examia-dark">{item.rationale}</p>
-                        </div>
-                      )}
-                      {item.options?.length > 0 && (
-                        <div>
-                          <p className="text-xs font-semibold text-examia-mid uppercase tracking-wider mb-1">All options</p>
-                          <ul className="text-sm text-examia-dark list-disc list-inside space-y-0.5">
-                            {item.options.map((opt, j) => (
-                              <li key={j} className={j === item.correctIndex ? 'text-emerald-700 font-medium' : j === item.selectedIndex ? 'text-rose-600' : ''}>
-                                {String.fromCharCode(65 + j)}. {stripDuplicateMcqLetterPrefix(opt, j)}
-                                {j === item.correctIndex && ' ✓'}
-                                {j === item.selectedIndex && j !== item.correctIndex && ' (your choice)'}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                <div key={quiz.resourceId} className="rounded-xl border border-examia-soft/40 overflow-hidden">
+                  <div className="flex items-center min-h-[3.25rem] bg-examia-soft/10">
+                    <button
+                      type="button"
+                      onClick={() => toggleQuiz(quiz.resourceId)}
+                      className="flex-1 flex items-center gap-3 px-4 py-3.5 min-h-[3.25rem] text-left hover:bg-examia-soft/20 transition-colors min-w-0"
+                    >
+                      <span className="font-semibold text-examia-dark truncate min-w-0 flex-1">{quiz.title}</span>
+                      <span className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200/80 px-2.5 py-1 rounded-full shrink-0 whitespace-nowrap">
+                        {quiz.items.length} wrong
+                      </span>
+                      <svg
+                        className={`w-5 h-5 text-examia-mid shrink-0 transition-transform ${quizOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-hidden
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {quiz.items.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startRecall(quiz.resourceId);
+                        }}
+                        className="shrink-0 self-stretch flex items-center justify-center gap-1.5 min-h-[3.25rem] px-4 border-l border-examia-soft/40 text-sm font-medium text-examia-dark hover:bg-examia-dark hover:text-white transition-colors whitespace-nowrap"
+                      >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Recall
+                      </button>
+                    )}
+                  </div>
+                  {inRecall && (
+                    <QuizWrongAnswerRecall
+                      quizTitle={quiz.title}
+                      items={quiz.items}
+                      recallIndex={recallIndex}
+                      recallSelected={recallSelected}
+                      recallRevealed={recallRevealed}
+                      onExit={exitRecall}
+                      onSelectOption={(j) => {
+                        setRecallSelected(j);
+                        setRecallRevealed(true);
+                      }}
+                      onNext={() => {
+                        setRecallIndex((i) => i + 1);
+                        setRecallSelected(null);
+                        setRecallRevealed(false);
+                      }}
+                    />
+                  )}
+                  {quizOpen && !inRecall && (
+                    <div className="border-t border-examia-soft/30 bg-white divide-y divide-examia-soft/20">
+                      {quiz.items.map((item) => {
+                        const itemKey = wrongAnswerItemKey(item);
+                        const open = expandedWrong.has(itemKey);
+                        return (
+                          <div key={itemKey} className="overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => toggleWrong(itemKey)}
+                              className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-examia-soft/5 transition-colors"
+                            >
+                              <span className="font-medium text-examia-dark line-clamp-2 flex-1 min-w-0 text-sm">
+                                Q: {item.questionText || 'Question'}
+                              </span>
+                              <svg
+                                className={`w-4 h-4 text-examia-mid shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {open && <WrongAnswerQuestionDetail item={item} />}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

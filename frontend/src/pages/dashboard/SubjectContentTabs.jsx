@@ -8,8 +8,13 @@ import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { fileNameWithoutExtension } from '../../utils/format';
 import { downloadMaterialsFile } from '../../utils/materialsDownload';
-import { showError } from '../../utils/swal';
+import { showError, showConfirm } from '../../utils/swal';
 import { MarkdownBlock } from '../../components/MarkdownBlock';
+import { MaterialFileSelector } from '../../components/MaterialFileSelector';
+import { VoiceDictationButton } from '../../components/VoiceDictationButton';
+import { VoiceCallButton } from '../../components/VoiceCallButton';
+import { TeachLearnVoiceCallBar } from '../../components/TeachLearnVoiceCallBar';
+import { useTeachLearnVoiceSession } from '../../hooks/useTeachLearnVoiceSession';
 import { getSubjectCardStyle } from '../../utils/subjectColors';
 
 /** Splits content by LaTeX blocks (\[ \], $$ $$, \( \), $ $) and returns array of { type: 'text'|'html', value } for rendering. */
@@ -413,10 +418,7 @@ export function SubjectStudyLearn() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [files, setFiles] = useState([]);
-  const [materialMode, setMaterialMode] = useState('all'); // 'all' | 'selected'
   const [selectedMaterialPaths, setSelectedMaterialPaths] = useState([]);
-  const [filesLoading, setFilesLoading] = useState(true);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -425,48 +427,22 @@ export function SubjectStudyLearn() {
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {
-    if (!subject?._id) return;
-    let cancelled = false;
-    setFilesLoading(true);
-    api
-      .get('/materials/subject-files', { params: { subjectId: subject._id } })
-      .then((res) => {
-        if (!cancelled && res.data?.success && Array.isArray(res.data.files)) setFiles(res.data.files);
-      })
-      .catch(() => {
-        if (!cancelled) setFiles([]);
-      })
-      .finally(() => {
-        if (!cancelled) setFilesLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [subject?._id]);
-
-  const toggleFile = (relativePath) => {
-    setSelectedMaterialPaths((prev) =>
-      prev.includes(relativePath) ? prev.filter((p) => p !== relativePath) : [...prev, relativePath]
-    );
-  };
-
-  const selectAllFiles = () => setSelectedMaterialPaths(files.map((f) => f.relativePath));
-  const clearSelection = () => setSelectedMaterialPaths([]);
-
   const handleSend = async (e) => {
     e.preventDefault();
     const text = input.trim();
     if (!text || !subject?._id || loading) return;
-    if (materialMode === 'selected' && selectedMaterialPaths.length === 0) return;
+    if (selectedMaterialPaths.length === 0) return;
     const userMsg = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setLoading(true);
     try {
       const conversation = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }));
-      const body = { subjectId: subject._id, messages: conversation };
-      if (materialMode === 'selected' && selectedMaterialPaths.length > 0) {
-        body.selectedMaterialPaths = selectedMaterialPaths;
-      }
+      const body = {
+        subjectId: subject._id,
+        messages: conversation,
+        selectedMaterialPaths,
+      };
       const { data } = await api.post('/ai/study-learn/chat', body);
       if (data.reply != null) {
         setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
@@ -497,129 +473,14 @@ export function SubjectStudyLearn() {
           </span>
           <div>
             <h2 className="text-xl font-bold text-examia-dark">Study Lab</h2>
-            <p className="text-examia-mid text-sm">Chat with your IB tutor. Choose which materials to use below.</p>
+            <p className="text-examia-mid text-sm">Chat with your IB tutor. Select one or more files below.</p>
           </div>
         </div>
-        {/* Material file selector — segmented control + file cards */}
-        <div className="mt-4 pt-4 border-t border-examia-soft/30">
-          <p className="text-xs font-medium text-examia-mid uppercase tracking-wide mb-3">Materials scope</p>
-          <div className="inline-flex p-1 rounded-xl bg-examia-soft/20 border border-examia-soft/40">
-            <button
-              type="button"
-              onClick={() => setMaterialMode('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                materialMode === 'all'
-                  ? 'bg-white text-examia-dark shadow-sm border border-examia-soft/40'
-                  : 'text-examia-mid hover:text-examia-dark'
-              }`}
-            >
-              All materials
-            </button>
-            <button
-              type="button"
-              onClick={() => setMaterialMode('selected')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                materialMode === 'selected'
-                  ? 'bg-white text-examia-dark shadow-sm border border-examia-soft/40'
-                  : 'text-examia-mid hover:text-examia-dark'
-              }`}
-            >
-              Selected files
-              {materialMode === 'selected' && selectedMaterialPaths.length > 0 && (
-                <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-examia-dark text-white text-xs font-semibold flex items-center justify-center">
-                  {selectedMaterialPaths.length}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {materialMode === 'selected' && (
-            <div className="mt-4">
-              {filesLoading ? (
-                <div className="flex items-center gap-3 py-8 text-examia-mid">
-                  <span className="animate-spin rounded-full h-6 w-6 border-2 border-examia-mid border-t-transparent" />
-                  <span className="text-sm">Loading materials…</span>
-                </div>
-              ) : files.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-examia-soft/50 bg-examia-soft/10 py-10 px-4 text-center">
-                  <svg className="w-10 h-10 mx-auto text-examia-soft mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="text-sm font-medium text-examia-dark">No materials yet</p>
-                  <p className="text-xs text-examia-mid mt-0.5">PDF, DOC, or TXT files for this subject will appear here.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs text-examia-mid">
-                      {selectedMaterialPaths.length} of {files.length} selected
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={selectAllFiles}
-                        className="text-xs font-medium text-examia-dark px-3 py-1.5 rounded-lg border border-examia-soft/50 hover:bg-examia-soft/20 transition"
-                      >
-                        Select all
-                      </button>
-                      <button
-                        type="button"
-                        onClick={clearSelection}
-                        className="text-xs font-medium text-examia-mid px-3 py-1.5 rounded-lg hover:bg-examia-soft/20 transition"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-                  <div className="max-h-52 overflow-y-auto rounded-xl border border-examia-soft/40 bg-examia-bg/50 p-2 space-y-1.5 scrollbar-thin">
-                    {files.map((f) => {
-                      const isSelected = selectedMaterialPaths.includes(f.relativePath);
-                      const ext = (f.name || '').split('.').pop()?.toLowerCase() || '';
-                      return (
-                        <button
-                          key={f.relativePath}
-                          type="button"
-                          onClick={() => toggleFile(f.relativePath)}
-                          className={`w-full flex items-center gap-3 text-left px-3 py-2.5 rounded-lg border transition-all ${
-                            isSelected
-                              ? 'bg-examia-dark/5 border-examia-dark/30 shadow-sm'
-                              : 'bg-white border-examia-soft/30 hover:border-examia-soft/50 hover:bg-examia-soft/10'
-                          }`}
-                        >
-                          <span
-                            className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${
-                              isSelected ? 'bg-examia-dark text-white' : 'bg-examia-soft/30 text-examia-mid'
-                            }`}
-                          >
-                            {ext === 'pdf' ? (
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
-                            ) : (
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                            )}
-                          </span>
-                          <span className="flex-1 min-w-0 text-sm font-medium text-examia-dark truncate" title={f.relativePath}>
-                            {fileNameWithoutExtension(f.name)}
-                          </span>
-                          {isSelected && (
-                            <span className="shrink-0 w-5 h-5 rounded-full bg-examia-dark text-white flex items-center justify-center">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {selectedMaterialPaths.length === 0 && (
-                    <p className="flex items-center gap-2 text-amber-600 text-xs mt-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200/60">
-                      <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                      Select at least one file to chat.
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
+        <MaterialFileSelector
+          subjectId={subject?._id}
+          selectedPaths={selectedMaterialPaths}
+          onSelectedPathsChange={setSelectedMaterialPaths}
+        />
       </div>
       <div className="flex-1 flex flex-col min-h-[420px] max-h-[70vh]">
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -667,8 +528,9 @@ export function SubjectStudyLearn() {
             />
             <button
               type="submit"
-              disabled={loading || !input.trim()}
+              disabled={loading || !input.trim() || selectedMaterialPaths.length === 0}
               className="px-5 py-3 rounded-xl bg-examia-dark text-white font-medium hover:bg-examia-mid disabled:opacity-50 shrink-0"
+              title={selectedMaterialPaths.length === 0 ? 'Select at least one file' : undefined}
             >
               Send
             </button>
@@ -684,37 +546,111 @@ export function SubjectFeynman() {
   const { subject } = useOutletContext() || {};
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
+  const [dictationInterim, setDictationInterim] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedMaterialPaths, setSelectedMaterialPaths] = useState([]);
   const messagesEndRef = useRef(null);
+
+  const voice = useTeachLearnVoiceSession({
+    input,
+    setInput,
+    dictationInterim,
+    setDictationInterim,
+    loading,
+    selectedMaterialPaths,
+  });
+
+  const {
+    callActive,
+    callPreview,
+    callAvailable,
+    callStatus,
+    voiceSupported,
+    voiceListening,
+    speakSupported,
+    agentSpeaking,
+    usingNaturalVoice,
+    speakReply,
+    stopSpeaking,
+    stopDictation,
+    playAssistantReply,
+    getCallPendingText,
+    clearCallSilenceTimer,
+    beginSending,
+    endSending,
+    registerSendMessage,
+    handleCallToggle,
+    handleDictateToggle,
+    composeTextInput,
+    stopVoiceBeforeManualEdit,
+  } = voice;
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, agentSpeaking, voiceListening]);
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || !subject?._id || loading) return;
-    const userMsg = { role: 'user', content: text };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setLoading(true);
-    try {
-      const conversation = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }));
-      const { data } = await api.post('/ai/feynman-chat', { subjectId: subject._id, messages: conversation });
-      if (data.reply != null) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+  const sendMessage = useCallback(
+    async (textOverride, e) => {
+      if (e?.preventDefault) e.preventDefault();
+
+      clearCallSilenceTimer();
+      stopSpeaking();
+
+      const text = (textOverride ?? (callActive ? getCallPendingText() : composeTextInput())).trim();
+
+      if (!text || !subject?._id || loading || agentSpeaking) return;
+      if (selectedMaterialPaths.length === 0) return;
+      if (!beginSending()) return;
+
+      const userMsg = { role: 'user', content: text };
+      setMessages((prev) => [...prev, userMsg]);
+      setLoading(true);
+
+      try {
+        const conversation = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }));
+        const { data } = await api.post('/ai/feynman-chat', {
+          subjectId: subject._id,
+          messages: conversation,
+          selectedMaterialPaths,
+        });
+        if (data.reply != null) {
+          setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+          setLoading(false);
+          await playAssistantReply(data.reply);
+        }
+      } catch (err) {
+        const errMsg = 'Sorry, something went wrong. ' + (err.response?.data?.message || err.message);
+        setMessages((prev) => [...prev, { role: 'assistant', content: errMsg }]);
+        setLoading(false);
+        await playAssistantReply(errMsg);
+      } finally {
+        setLoading(false);
+        endSending();
       }
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: 'Sorry, something went wrong. ' + (err.response?.data?.message || err.message) },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [
+      agentSpeaking,
+      beginSending,
+      callActive,
+      clearCallSilenceTimer,
+      composeTextInput,
+      endSending,
+      getCallPendingText,
+      loading,
+      messages,
+      playAssistantReply,
+      selectedMaterialPaths,
+      stopSpeaking,
+      subject?._id,
+    ]
+  );
+
+  useEffect(() => {
+    registerSendMessage(sendMessage);
+  }, [registerSendMessage, sendMessage]);
+
+  const handleSend = (e) => sendMessage(undefined, e);
 
   return (
     <motion.section
@@ -732,16 +668,35 @@ export function SubjectFeynman() {
           </span>
           <div>
             <h2 className="text-xl font-bold text-examia-dark">Teach & Learn</h2>
-            <p className="text-examia-mid text-sm">Teach a topic; the agent will ask questions as a curious learner, then evaluate your understanding when you say you&apos;re done.</p>
+            <p className="text-examia-mid text-sm">
+              Type or dictate your message. Use the green phone button for a voice call with natural AI speech.
+            </p>
           </div>
+        </div>
+        <MaterialFileSelector
+          subjectId={subject?._id}
+          selectedPaths={selectedMaterialPaths}
+          onSelectedPathsChange={setSelectedMaterialPaths}
+        />
+        <div className="mt-4">
+          <TeachLearnVoiceCallBar
+            callActive={callActive}
+            callAvailable={callAvailable}
+            status={callStatus}
+            usingNaturalVoice={usingNaturalVoice}
+          />
         </div>
       </div>
       <div className="flex-1 flex flex-col min-h-[420px] max-h-[70vh]">
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 && (
             <div className="text-center py-8 text-examia-mid text-sm">
-              <p>Choose a topic and teach it to the Teach & Learn agent.</p>
-              <p className="mt-1">After each concept, it will ask clarification questions. When you&apos;re finished, say &quot;I&apos;m done&quot; or &quot;That&apos;s everything&quot; to get a diagnostic evaluation (no grades).</p>
+              <p>Choose files above, then explain a topic to the Teach & Learn agent.</p>
+              <p className="mt-1">
+                {callActive
+                  ? 'On a call: keep talking, then pause — your message sends automatically and the agent replies by voice.'
+                  : 'Start the green call button for hands-free voice conversation, or type/dictate and press Send.'}
+              </p>
             </div>
           )}
           {messages.map((m, i) => (
@@ -759,7 +714,27 @@ export function SubjectFeynman() {
                 }`}
               >
                 {m.role === 'assistant' ? (
-                  <MarkdownBlock content={m.content} className="text-sm font-sans m-0 block" />
+                  <div>
+                    {callActive && i === messages.length - 1 && agentSpeaking && (
+                      <p className="text-xs font-medium text-examia-mid mb-2 flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-examia-dark animate-pulse" />
+                        Speaking…
+                      </p>
+                    )}
+                    <MarkdownBlock content={m.content} className="text-sm font-sans m-0 block" />
+                    {speakSupported && m.role === 'assistant' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          stopDictation();
+                          speakReply(m.content);
+                        }}
+                        className="mt-2 text-xs font-medium text-examia-mid hover:text-examia-dark underline"
+                      >
+                        Replay voice
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <MessageContent content={m.content} className="text-sm font-sans m-0 block" />
                 )}
@@ -770,22 +745,86 @@ export function SubjectFeynman() {
           <div ref={messagesEndRef} />
         </div>
         <form onSubmit={handleSend} className="p-4 border-t border-examia-soft/30">
-          <div className="flex gap-2">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend(e))}
-              placeholder="Explain a concept or say you're done…"
-              rows={2}
-              className="flex-1 rounded-xl border border-examia-soft/50 bg-white text-examia-dark px-4 py-3 text-sm resize-none focus:ring-2 focus:ring-examia-mid focus:border-transparent"
-              disabled={loading}
+          <div className="flex gap-2 items-end">
+            <div className="flex-1 min-w-0">
+              <textarea
+                value={
+                  callActive
+                    ? callPreview
+                    : input + (dictationInterim ? (input && !input.endsWith(' ') ? ' ' : '') + dictationInterim : '')
+                }
+                readOnly={callActive}
+                onChange={(e) => {
+                  if (callActive) return;
+                  stopVoiceBeforeManualEdit();
+                  setInput(e.target.value);
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend(e))}
+                placeholder={
+                  agentSpeaking
+                    ? 'Agent is speaking…'
+                    : callActive && voiceListening
+                      ? 'Listening… pause ~1.5s when done speaking'
+                      : callActive && loading
+                        ? 'Sending your message…'
+                        : voiceListening
+                          ? 'Dictating…'
+                          : "Explain a concept or say you're done…"
+                }
+                rows={2}
+                className={`w-full rounded-xl border bg-white text-examia-dark px-4 py-3 text-sm resize-none focus:ring-2 focus:ring-examia-mid focus:border-transparent ${
+                  voiceListening
+                    ? callActive
+                      ? 'border-emerald-300 ring-1 ring-emerald-200'
+                      : 'border-rose-300 ring-1 ring-rose-200'
+                    : 'border-examia-soft/50'
+                } ${callActive ? 'bg-emerald-50/30' : ''}`}
+                disabled={loading || agentSpeaking}
+              />
+              {callActive && voiceListening && !loading && (
+                <p className="text-xs text-emerald-700 mt-1.5 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Pause speaking to send automatically
+                </p>
+              )}
+              {!callActive && voiceListening && (
+                <p className="text-xs text-rose-600 mt-1.5 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  Dictating… tap mic to stop
+                </p>
+              )}
+            </div>
+            <VoiceDictationButton
+              supported={voiceSupported}
+              listening={voiceListening && !callActive}
+              onToggle={handleDictateToggle}
+              disabled={loading || agentSpeaking || callActive || selectedMaterialPaths.length === 0}
+            />
+            <VoiceCallButton
+              active={callActive}
+              supported={callAvailable}
+              onToggle={handleCallToggle}
+              disabled={loading || agentSpeaking || selectedMaterialPaths.length === 0}
             />
             <button
               type="submit"
-              disabled={loading || !input.trim()}
+              disabled={
+                loading ||
+                selectedMaterialPaths.length === 0 ||
+                (callActive
+                  ? !getCallPendingText()
+                  : !(input.trim() || dictationInterim.trim()))
+              }
               className="px-5 py-3 rounded-xl bg-examia-dark text-white font-medium hover:bg-examia-mid disabled:opacity-50 shrink-0"
+              title={
+                callActive
+                  ? 'Send now without waiting for pause (optional)'
+                  : selectedMaterialPaths.length === 0
+                    ? 'Select at least one file'
+                    : undefined
+              }
             >
-              Send
+              {callActive && loading ? '…' : 'Send'}
             </button>
           </div>
         </form>
@@ -905,6 +944,108 @@ function highlightMatches(text, search) {
   return parts.length ? parts : [{ text, highlight: false }];
 }
 
+/** Term titles from mammoth HTML (h3 headings, or leading <strong> in glossary paragraphs). */
+function extractDefinitionTitlesFromHtml(html) {
+  if (!html?.trim()) return null;
+  const safe = DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    ADD_ATTR: ['style'],
+  });
+  const doc = new DOMParser().parseFromString(safe, 'text/html');
+  const titles = new Set();
+
+  const addTitle = (raw) => {
+    const t = String(raw || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (t && t.length <= 160 && !/^[A-Z]$/.test(t)) titles.add(t);
+  };
+
+  doc.querySelectorAll('h3').forEach((el) => addTitle(el.textContent));
+
+  doc.querySelectorAll('p').forEach((p) => {
+    const strong = p.querySelector(':scope > strong');
+    if (!strong) return;
+    const title = strong.textContent;
+    const full = p.textContent?.replace(/\s+/g, ' ').trim() || '';
+    const titleNorm = title?.replace(/\s+/g, ' ').trim() || '';
+    if (!titleNorm || full.length <= titleNorm.length + 8) return;
+    if (full.startsWith(titleNorm)) addTitle(titleNorm);
+  });
+
+  return titles.size ? titles : null;
+}
+
+function renderHighlightedParts(text, searchQuery) {
+  return highlightMatches(text, searchQuery).map((p, j) =>
+    p.highlight ? (
+      <mark key={j} className="bg-amber-200/80 text-examia-dark rounded px-0.5">
+        {p.text}
+      </mark>
+    ) : (
+      <span key={j}>{p.text}</span>
+    )
+  );
+}
+
+/** Plain-text glossary view (letter filter / search): bold term titles like the “All” HTML view. */
+function DefinitionGlossaryLine({ line, searchQuery, titles }) {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return (
+      <span className="block py-0.5" aria-hidden>
+        {'\n'}
+      </span>
+    );
+  }
+
+  let titlePart = null;
+  let bodyPart = null;
+
+  if (titles?.has(trimmed)) {
+    titlePart = trimmed;
+  } else if (titles?.size) {
+    const byLength = [...titles].sort((a, b) => b.length - a.length);
+    for (const title of byLength) {
+      if (trimmed.startsWith(title)) {
+        const rest = trimmed.slice(title.length).trim();
+        if (rest) {
+          titlePart = title;
+          bodyPart = rest;
+          break;
+        }
+      }
+    }
+  }
+
+  if (titlePart && !bodyPart) {
+    return (
+      <span className="block py-0.5 font-bold text-examia-dark">
+        {renderHighlightedParts(titlePart, searchQuery)}
+        {'\n'}
+      </span>
+    );
+  }
+
+  if (titlePart && bodyPart) {
+    return (
+      <span className="block py-0.5">
+        <span className="font-bold text-examia-dark">{renderHighlightedParts(titlePart, searchQuery)}</span>
+        <span> </span>
+        {renderHighlightedParts(bodyPart, searchQuery)}
+        {'\n'}
+      </span>
+    );
+  }
+
+  return (
+    <span className="block py-0.5">
+      {renderHighlightedParts(line, searchQuery)}
+      {'\n'}
+    </span>
+  );
+}
+
 /** Top-right style control: downloads original file via `/api/materials/...?download=1` (cookies). */
 function MaterialsDownloadButton({ apiPath, query, suggestedFilename, className = '' }) {
   const [busy, setBusy] = useState(false);
@@ -968,10 +1109,9 @@ function SubjectFundamentalDocs({
   downloadFileBasePath,
   emptyTitle,
   emptyHint,
-  searchLabel,
 }) {
   const { subjectId } = useParams();
-  const searchId = useId();
+  const toolbarId = useId();
   const viewerTitleId = useId();
   const dismissedRef = useRef(false);
   const [files, setFiles] = useState([]);
@@ -983,7 +1123,6 @@ function SubjectFundamentalDocs({
   const [contentHtml, setContentHtml] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [letterFilter, setLetterFilter] = useState('all');
   const contentRef = useRef(null);
 
@@ -995,7 +1134,6 @@ function SubjectFundamentalDocs({
       setViewContent('');
       setContentHtml(null);
       setViewError(null);
-      setSearchQuery('');
       setLetterFilter('all');
       setViewLoading(true);
       try {
@@ -1066,16 +1204,9 @@ function SubjectFundamentalDocs({
     return sections[letterFilter] || all;
   }, [letterFilter, all, sections, letters]);
 
-  const filteredBySearch = useMemo(() => {
-    if (!searchQuery.trim()) return displayedText;
-    const q = searchQuery.trim().toLowerCase();
-    const lines = displayedText.split('\n');
-    const matched = lines.filter((line) => line.toLowerCase().includes(q));
-    return matched.join('\n') || displayedText;
-  }, [displayedText, searchQuery]);
-
-  /** Formatted Word HTML only for “All” + no search; letter (or search) uses plain text so A–Z glossary filters keep working. */
-  const showRichHtml = Boolean(contentHtml && !searchQuery.trim() && letterFilter === 'all');
+  /** Formatted Word HTML only for “All”; letter filter uses plain text so A–Z glossary filters keep working. */
+  const showRichHtml = Boolean(contentHtml && letterFilter === 'all');
+  const definitionTitles = useMemo(() => extractDefinitionTitlesFromHtml(contentHtml), [contentHtml]);
   const showLetterRow = Boolean(letters && letters.length > 0);
 
   const closeView = () => {
@@ -1085,7 +1216,6 @@ function SubjectFundamentalDocs({
     setViewContent('');
     setContentHtml(null);
     setViewError(null);
-    setSearchQuery('');
     setLetterFilter('all');
   };
 
@@ -1143,10 +1273,10 @@ function SubjectFundamentalDocs({
                 {fileNameWithoutExtension(viewingFile)}
               </h3>
               {files.length > 1 && (
-                <label className="text-xs text-examia-mid shrink-0" htmlFor={`${searchId}-doc`}>
+                <label className="text-xs text-examia-mid shrink-0" htmlFor={`${toolbarId}-doc`}>
                   Document
                   <select
-                    id={`${searchId}-doc`}
+                    id={`${toolbarId}-doc`}
                     className="ml-2 rounded-lg border border-examia-soft/50 bg-white px-2 py-1.5 text-sm text-examia-dark max-w-[220px]"
                     value={(files.find((f) => f.name === viewingFile) || files[0]).relativePath || (files.find((f) => f.name === viewingFile) || files[0]).name}
                     onChange={(e) => {
@@ -1172,20 +1302,8 @@ function SubjectFundamentalDocs({
                 />
               )}
             </div>
+            {showLetterRow && (
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-4 pb-3 pt-0">
-              <label className="sr-only" htmlFor={searchId}>{searchLabel}</label>
-              <input
-                id={searchId}
-                type="search"
-                placeholder="Search…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 min-w-[120px] max-w-xs rounded-lg border border-examia-soft/50 bg-white px-3 py-2 text-sm text-examia-dark placeholder:text-examia-mid focus:ring-2 focus:ring-examia-mid focus:border-transparent"
-              />
-              {contentHtml && searchQuery.trim() && (
-                <p className="text-[11px] text-examia-mid w-full sm:w-auto">Showing plain text matches; clear search for formatted view.</p>
-              )}
-              {showLetterRow && (
                 <div className="flex items-center gap-1 flex-wrap w-full sm:w-auto">
                   <span className="text-xs font-medium text-examia-mid mr-1">Letter:</span>
                   <button
@@ -1206,8 +1324,8 @@ function SubjectFundamentalDocs({
                     </button>
                   ))}
                 </div>
-              )}
             </div>
+            )}
           </div>
           <div ref={contentRef} className="flex-1 overflow-auto p-4 sm:p-6 min-h-0">
             {viewLoading && (
@@ -1223,28 +1341,16 @@ function SubjectFundamentalDocs({
             )}
             {!viewLoading && !viewError && !showRichHtml && (
               <div className="max-w-4xl mx-auto">
-                <pre className="whitespace-pre-wrap font-sans text-sm sm:text-base leading-relaxed text-examia-dark bg-transparent p-0 border-0">
-                  {filteredBySearch.split('\n').map((line, i) => {
-                    const parts = highlightMatches(line, searchQuery);
-                    return (
-                      <span key={i} className="block py-0.5">
-                        {parts.map((p, j) =>
-                          p.highlight ? (
-                            <mark key={j} className="bg-amber-200/80 text-examia-dark rounded px-0.5">
-                              {p.text}
-                            </mark>
-                          ) : (
-                            <span key={j}>{p.text}</span>
-                          )
-                        )}
-                        {'\n'}
-                      </span>
-                    );
-                  })}
-                </pre>
-                {searchQuery.trim() && filteredBySearch === displayedText && displayedText.length > 0 && (
-                  <p className="text-examia-mid text-xs mt-2">Highlighting matches for “{searchQuery}”</p>
-                )}
+                <div className="whitespace-pre-wrap font-sans text-sm sm:text-base leading-relaxed text-examia-dark">
+                  {displayedText.split('\n').map((line, i) => (
+                    <DefinitionGlossaryLine
+                      key={i}
+                      line={line}
+                      searchQuery=""
+                      titles={definitionTitles}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1356,7 +1462,6 @@ export function SubjectDefinitions() {
       downloadFileBasePath="/materials/definitions/file"
       emptyTitle="This subject does not have definitions yet."
       emptyHint="Check back later or use other resources for this subject."
-      searchLabel="Search definitions"
     />
   );
 }
@@ -1370,7 +1475,6 @@ export function SubjectCommandTerms() {
       downloadFileBasePath="/materials/command-terms/file"
       emptyTitle="No command terms document is linked to this subject yet."
       emptyHint="If you expected IB command terms here, ask your admin to match the subject name to the files in commandterms."
-      searchLabel="Search command terms"
     />
   );
 }
@@ -1386,16 +1490,7 @@ export function SubjectChecklists() {
   const [viewContent, setViewContent] = useState('');
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const contentRef = useRef(null);
-
-  const filteredBySearch = useMemo(() => {
-    if (!searchQuery.trim()) return viewContent;
-    const q = searchQuery.trim().toLowerCase();
-    const lines = viewContent.split('\n');
-    const matched = lines.filter((line) => line.toLowerCase().includes(q));
-    return matched.join('\n') || viewContent;
-  }, [viewContent, searchQuery]);
 
   /** Group checklist files by first letter of display name (A, B, C, …). */
   const filesByLetter = useMemo(() => {
@@ -1432,7 +1527,6 @@ export function SubjectChecklists() {
     setViewingFile(fileName || relativePath);
     setViewContent('');
     setViewError(null);
-    setSearchQuery('');
     setViewLoading(true);
     api.get('/materials/checklists/file/content', { params: { path: relativePath } })
       .then((res) => {
@@ -1448,7 +1542,6 @@ export function SubjectChecklists() {
     setViewingRelativePath(null);
     setViewContent('');
     setViewError(null);
-    setSearchQuery('');
   };
 
   return (
@@ -1517,17 +1610,6 @@ export function SubjectChecklists() {
                 />
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2 px-4 pb-3 pt-0">
-              <label className="sr-only" htmlFor="checklists-search">Search checklists</label>
-              <input
-                id="checklists-search"
-                type="search"
-                placeholder="Search…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 min-w-[120px] max-w-xs rounded-lg border border-examia-soft/50 bg-white px-3 py-2 text-sm text-examia-dark placeholder:text-examia-mid focus:ring-2 focus:ring-examia-mid focus:border-transparent"
-              />
-            </div>
           </div>
           <div ref={contentRef} className="flex-1 overflow-auto p-4 sm:p-6 min-h-0">
             {viewLoading && <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-2 border-examia-mid border-t-transparent" /></div>}
@@ -1535,21 +1617,184 @@ export function SubjectChecklists() {
             {!viewLoading && !viewError && (
               <div className="max-w-4xl mx-auto">
                 <pre className="whitespace-pre-wrap font-sans text-sm sm:text-base leading-relaxed text-examia-dark bg-transparent p-0 border-0">
-                  {filteredBySearch.split('\n').map((line, i) => {
-                    const parts = highlightMatches(line, searchQuery);
-                    return (
-                      <span key={i} className="block py-0.5">
-                        {parts.map((p, j) => p.highlight ? <mark key={j} className="bg-amber-200/80 text-examia-dark rounded px-0.5">{p.text}</mark> : <span key={j}>{p.text}</span>)}
-                        {'\n'}
-                      </span>
-                    );
-                  })}
+                  {viewContent}
                 </pre>
-                {searchQuery.trim() && <p className="text-examia-mid text-xs mt-2">Highlighting matches for &quot;{searchQuery}&quot;</p>}
               </div>
             )}
           </div>
         </div>
+      )}
+    </motion.section>
+  );
+}
+
+/** School-private IA sample uploads (teachers only). Students in the same school can view. */
+export function SubjectIaSamples() {
+  const { subject } = useOutletContext() || {};
+  const { user } = useAuth();
+  const subjectId = subject?._id;
+  const canUpload = user?.role === 'teacher';
+  const [samples, setSamples] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadFile, setUploadFile] = useState(null);
+
+  const loadSamples = useCallback(() => {
+    if (!subjectId) return Promise.resolve();
+    setLoading(true);
+    setError(null);
+    return api
+      .get('/ia-samples', { params: { subjectId } })
+      .then((r) => setSamples(r.data.samples || []))
+      .catch((err) => setError(err.response?.data?.message || err.message))
+      .finally(() => setLoading(false));
+  }, [subjectId]);
+
+  useEffect(() => {
+    loadSamples();
+  }, [loadSamples]);
+
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    if (!uploadFile || !subjectId) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', uploadFile);
+      form.append('subjectId', subjectId);
+      form.append('title', uploadTitle.trim() || uploadFile.name);
+      await api.post('/ia-samples', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setUploadTitle('');
+      setUploadFile(null);
+      await loadSamples();
+    } catch (err) {
+      await showError(err.response?.data?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    const ok = await showConfirm('Delete this IA sample?', 'This cannot be undone.');
+    if (!ok) return;
+    try {
+      await api.delete(`/ia-samples/${id}`);
+      await loadSamples();
+    } catch (err) {
+      await showError(err.response?.data?.message || 'Delete failed');
+    }
+  };
+
+  const openFile = (id) => window.open(`/api/ia-samples/${id}/file`, '_blank');
+
+  return (
+    <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+      <h2 className="text-lg font-semibold text-examia-dark mb-1">IA samples</h2>
+      <p className="text-sm text-examia-mid mb-5 max-w-2xl">
+        Example internal assessments shared by your school. Only people at your school can see these files — other schools cannot.
+      </p>
+
+      {canUpload && (
+        <form
+          onSubmit={handleUpload}
+          className="mb-6 p-4 rounded-xl border border-examia-soft/40 bg-gradient-to-br from-examia-soft/10 to-white space-y-3"
+        >
+          <p className="text-sm font-medium text-examia-dark">Upload a sample for your school</p>
+          <input
+            type="text"
+            placeholder="Title (optional — uses file name if empty)"
+            value={uploadTitle}
+            onChange={(e) => setUploadTitle(e.target.value)}
+            className="w-full max-w-md rounded-lg border border-examia-soft/50 bg-white px-3 py-2 text-sm"
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
+              required
+              onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+              className="text-sm text-examia-dark file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-examia-dark file:text-white file:text-sm file:font-medium"
+            />
+            <button
+              type="submit"
+              disabled={uploading || !uploadFile}
+              className="px-4 py-2 rounded-lg bg-examia-dark text-white text-sm font-medium hover:bg-examia-mid disabled:opacity-50"
+            >
+              {uploading ? 'Uploading…' : 'Upload'}
+            </button>
+          </div>
+          <p className="text-xs text-examia-mid">PDF, Word, TXT, or images · max 20 MB</p>
+        </form>
+      )}
+
+      {loading && (
+        <div className="flex items-center gap-2 py-8 text-examia-mid text-sm">
+          <span className="animate-spin rounded-full h-5 w-5 border-2 border-examia-mid border-t-transparent" />
+          Loading samples…
+        </div>
+      )}
+      {error && !loading && <p className="text-red-600 text-sm">{error}</p>}
+
+      {!loading && !error && samples.length === 0 && (
+        <div className="rounded-2xl border-2 border-dashed border-examia-soft/40 bg-examia-soft/5 p-10 text-center">
+          <p className="font-semibold text-examia-dark">No IA samples yet</p>
+          <p className="text-examia-mid text-sm mt-2 max-w-md mx-auto">
+            {canUpload
+              ? 'Upload exemplar work above so students at your school can refer to it.'
+              : 'Your teachers have not uploaded any samples for this subject yet.'}
+          </p>
+        </div>
+      )}
+
+      {!loading && samples.length > 0 && (
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {samples.map((s) => (
+            <li
+              key={s._id}
+              className="flex items-center gap-3 rounded-xl border border-examia-soft/35 bg-white p-4 shadow-sm hover:border-examia-soft/55 transition"
+            >
+              <span className="shrink-0 w-10 h-10 rounded-lg bg-violet-100 text-violet-800 flex items-center justify-center">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-examia-dark truncate">{s.title}</p>
+                <p className="text-xs text-examia-mid mt-0.5 truncate">
+                  {s.uploadedBy?.name ? `Uploaded by ${s.uploadedBy.name}` : 'School sample'}
+                  {s.createdAt && ` · ${new Date(s.createdAt).toLocaleDateString()}`}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => openFile(s._id)}
+                  className="p-2 rounded-lg text-examia-dark hover:bg-examia-soft/25 transition"
+                  title="Open"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </button>
+                {canUpload && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(s._id)}
+                    className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 transition"
+                    title="Delete"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </motion.section>
   );

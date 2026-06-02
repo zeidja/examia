@@ -115,7 +115,7 @@ const flatNavIcons = {
   'Schools': 'folder',
   'Reports': 'clipboard',
   'Subjects': 'book',
-  'Fundamentals': 'folder',
+  Workspace: 'folder',
   'AI configuration': 'lightbulb',
   'Users': 'folder',
   'Classes': 'clipboard',
@@ -131,7 +131,7 @@ const superAdminNav = [
   { to: '/schools', label: 'Schools' },
   { to: '/reports', label: 'Reports' },
   { to: '/subjects', label: 'Subjects' },
-  { to: '/materials', label: 'Fundamentals' },
+  { to: '/materials', label: 'Workspace' },
   { to: '/ai-prompts', label: 'AI configuration' },
   { to: '/users', label: 'Users' },
 ];
@@ -162,7 +162,7 @@ const studentNavMain = [
 
 /** Tabs shown before the Internal Assessment dropdown (under Flashcards). */
 const studentSubjectTabsBeforeIA = [
-  { toPath: 'materials', label: 'Fundamentals', icon: 'book' },
+  { toPath: 'materials', label: 'Workspace', icon: 'book' },
   { toPath: 'notes', label: 'Note-taking', icon: 'notes' },
   { toPath: 'quizzes', label: 'Quizzes', icon: 'clipboard' },
   { toPath: 'flash-cards', label: 'Flashcards', icon: 'cards' },
@@ -173,6 +173,7 @@ const studentSubjectTabsInternalAssessment = [
   { toPath: 'feedback', label: 'Feedback Generator', icon: 'fileCheck' },
   { toPath: 'ideas', label: 'Idea Generation', icon: 'lightbulb' },
   { toPath: 'ia-guide', label: 'IA Guide', icon: 'guide' },
+  { toPath: 'ia-samples', label: 'IA samples', icon: 'library' },
 ];
 
 /** Tabs shown after the Internal Assessment dropdown. */
@@ -192,6 +193,7 @@ const iaOnlySubjectTabs = [
   { toPath: 'feedback', label: 'Feedback Generator', icon: 'fileCheck' },
   { toPath: 'ideas', label: 'Idea Generation', icon: 'lightbulb' },
   { toPath: 'ia-guide', label: 'IA Guide', icon: 'guide' },
+  { toPath: 'ia-samples', label: 'IA samples', icon: 'library' },
 ];
 
 function isPathUnderSubject(pathname, sid) {

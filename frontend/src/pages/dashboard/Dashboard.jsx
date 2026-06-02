@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import { useState, useEffect, useMemo } from 'react';
+import { DashboardCalendar } from '../../components/DashboardCalendar';
 
 const roleLabels = {
   super_admin: 'Super Admin',
@@ -120,6 +121,13 @@ export function Dashboard() {
         </div>
       )}
 
+      {(user?.role === 'student' || user?.role === 'school_admin' || user?.role === 'teacher') && (
+        <DashboardCalendar
+          canManageEvents={user?.role === 'school_admin'}
+          libraryResourceLinks={user?.role === 'teacher'}
+        />
+      )}
+
       {user?.role === 'school_admin' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
           {[
@@ -144,7 +152,7 @@ export function Dashboard() {
       {/* Student: Quick actions + New quizzes + Flashcards */}
       {user?.role === 'student' && (
         <>
-          <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-examia-soft/20 mb-8">
+          <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-examia-soft/20 mb-8 mt-0">
             <h2 className="text-lg font-semibold text-examia-dark mb-1">Quick actions</h2>
             <p className="text-examia-mid text-sm mb-6">Jump to your content and tools.</p>
             <div className="flex flex-wrap gap-3">

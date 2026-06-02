@@ -75,4 +75,33 @@ const reviewSubmissionUpload = multer({
 });
 export const uploadReviewSubmission = reviewSubmissionUpload.single('file');
 
+const iaSamplesDir = path.join(UPLOADS_DIR, 'ia-samples');
+if (!fs.existsSync(iaSamplesDir)) fs.mkdirSync(iaSamplesDir, { recursive: true });
+
+const iaSampleStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, iaSamplesDir),
+  filename: (req, file, cb) =>
+    cb(null, `${Date.now()}-${(file.originalname || 'file').replace(/[^a-zA-Z0-9.-]/g, '_')}`),
+});
+const iaSampleUpload = multer({
+  storage: iaSampleStorage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'image/png',
+      'image/jpeg',
+    ];
+    if (allowed.includes(file.mimetype) || /\.(pdf|doc|docx|txt|png|jpg|jpeg)$/i.test(file.originalname || '')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Allowed: PDF, Word, TXT, or images'));
+    }
+  },
+});
+export const uploadIaSample = iaSampleUpload.single('file');
+
 export const uploadsDir = UPLOADS_DIR;
