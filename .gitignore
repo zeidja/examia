@@ -39,5 +39,8 @@ pnpm-debug.log*
 *.sln
 *.sw?
 
+# Server uploads (user content)
+backend/uploads/
+
 # Optional: uncomment if you want to ignore uploaded/generated materials
 # materials/
