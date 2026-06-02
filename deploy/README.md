@@ -50,89 +50,34 @@ After setup:
 
 ## 2. Auto-deploy on push (GitHub Actions)
 
-GitHub’s runners often **cannot SSH to Hostinger on port 22** (`dial tcp …:22: i/o timeout`) because the VPS firewall blocks unknown IPs. Use the **webhook deploy** below (HTTP on port 80, already open for the app).
+So that every push to `main` updates the server:
 
-### Option A — Webhook deploy (recommended)
+1. In GitHub: **Repo → Settings → Secrets and variables → Actions**.
+2. Add these **Repository secrets**:
 
-**On the server** (SSH from your computer still works):
+   | Name            | Value                    | Secret? |
+   |-----------------|--------------------------|--------|
+   | `DEPLOY_HOST`   | `187.77.74.33`           | Yes    |
+   | `DEPLOY_USER`   | `root`                   | Yes    |
+   | `DEPLOY_SSH_KEY`| Server SSH private key   | Yes    |
 
-```bash
-ssh root@187.77.74.33
+3. **Create deploy key on server** (so GitHub Actions can SSH in):
 
-# Generate a long random secret
-openssl rand -hex 32
+   On your **local machine** (or server):
 
-# Add to backend env (use the value from above)
-nano /var/www/examia/backend/.env
-```
+   ```bash
+   ssh-keygen -t ed25519 -C "github-deploy" -f deploy_key -N ""
+   ```
 
-Add:
+   - Add **public** key to the server:
+     ```bash
+     # Copy deploy_key.pub content to server's authorized_keys
+     ssh root@187.77.74.33 "mkdir -p ~/.ssh && echo 'PASTE_deploy_key.pub_CONTENT' >> ~/.ssh/authorized_keys"
+     ```
+   - In GitHub: **Settings → Secrets → DEPLOY_SSH_KEY** → paste the **private** key content (`deploy_key`).
+   - Delete local private key after: `rm deploy_key deploy_key.pub`
 
-```env
-DEPLOY_WEBHOOK_SECRET=paste-the-hex-secret-here
-EXAMIA_DIR=/var/www/examia
-```
-
-Deploy the webhook route once (pull latest `main` manually if needed):
-
-```bash
-cd /var/www/examia && git pull origin main
-cd backend && npm ci --omit=dev
-pm2 restart examia-backend
-```
-
-Test from your laptop:
-
-```bash
-curl -sS -X POST -H "X-Deploy-Token: YOUR_SECRET" http://187.77.74.33/api/deploy/webhook
-# Expect: {"message":"Deploy started"} and HTTP 202
-```
-
-**In GitHub** → **Settings → Secrets and variables → Actions**, add:
-
-| Name | Value | Example |
-|------|--------|---------|
-| `DEPLOY_URL` | App base URL (no trailing slash) | `http://187.77.74.33` |
-| `DEPLOY_WEBHOOK_SECRET` | Same value as server `.env` | (your hex secret) |
-
-Push to `main` → workflow calls the webhook → server runs `deploy/deploy.sh`.
-
-You can remove `DEPLOY_HOST` / `DEPLOY_SSH_KEY` secrets if you only use the webhook.
-
-### Option B — SSH deploy (fallback)
-
-Only works if port **22** is open to [GitHub Actions IP ranges](https://api.github.com/meta) (Hostinger firewall → allow SSH from those IPs, or disable “SSH only from whitelist”).
-
-| Name | Value |
-|------|--------|
-| `DEPLOY_HOST` | `187.77.74.33` |
-| `DEPLOY_USER` | `root` |
-| `DEPLOY_SSH_KEY` | Private deploy key (see below) |
-| `DEPLOY_PORT` | Optional, default `22` |
-
-Create deploy key and add public key to `~/.ssh/authorized_keys` on the server (same as before). **Do not set** `DEPLOY_WEBHOOK_SECRET` if you want SSH-only; the workflow uses SSH when webhook secrets are empty.
-
-### Push succeeded but the server did not update?
-
-Auto-deploy is **still enabled** on every push to `main`. It does **not** run `deploy.sh` on GitHub’s servers — it only triggers your VPS.
-
-1. Open **GitHub → Actions → Deploy to Server** and open the latest run.
-2. Check which step ran:
-   - **Deploy via webhook** — needs `DEPLOY_URL` + `DEPLOY_WEBHOOK_SECRET` secrets **and** the same secret in server `backend/.env` (one-time `git pull` + `pm2 restart` for the webhook route).
-   - **Deploy via SSH** — often **fails** with `dial tcp …:22: i/o timeout` on Hostinger; switch to webhook.
-   - **Both skipped** — no secrets configured; add webhook secrets (table above).
-3. A green checkmark with **only** “Check deploy is configured” (old workflow) meant secrets existed but SSH never connected — the server was not updated.
-
-### Troubleshooting
-
-| Error | Fix |
-|--------|-----|
-| `dial tcp …:22: i/o timeout` | Use **Option A (webhook)** or open port 22 to GitHub Actions IPs in Hostinger. |
-| Webhook step skipped | Add `DEPLOY_URL` and `DEPLOY_WEBHOOK_SECRET` in GitHub secrets. |
-| Webhook `401` | `DEPLOY_WEBHOOK_SECRET` must match exactly on server and GitHub. |
-| Webhook `404` | Server code is old; SSH in and `git pull`, `pm2 restart examia-backend`. |
-| Webhook `503` | Set `DEPLOY_WEBHOOK_SECRET` in `/var/www/examia/backend/.env` and `pm2 restart examia-backend`. |
-| Webhook `500` deploy script not found | Run `setup-server.sh` or clone repo to `/var/www/examia`. |
+4. Push to `main`; the **Deploy to Server** workflow will run and execute `deploy/deploy.sh` on the server (pull, install, build, restart).
 
 ---
 
